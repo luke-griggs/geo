@@ -20,7 +20,7 @@ import { eq, and } from "drizzle-orm";
 const db = drizzle(process.env.DATABASE_URL!, { schema });
 
 // Import the runner logic (we'll inline it here to avoid module resolution issues)
-import { runOpenAI, isLLMError, type LLMProvider } from "../lib/llm";
+import { runPromptAgainstLLM, isLLMError, type LLMProvider } from "../lib/llm";
 
 interface RunResult {
   promptId: string;
@@ -102,86 +102,93 @@ async function runPromptsForDomain(domainId: string): Promise<RunResult[]> {
 
   for (let i = 0; i < activePrompts.length; i++) {
     const p = activePrompts[i];
-    const promptRunId = generateId();
+    const providers: LLMProvider[] = (p.selectedProviders as LLMProvider[]) || ["chatgpt"];
 
     console.log(
       `\n  [${i + 1}/${activePrompts.length}] "${p.promptText.slice(0, 50)}..."`
     );
+    console.log(`    Running on: ${providers.join(", ")}`);
 
-    try {
-      const response = await runOpenAI(p.promptText);
+    // Run for all providers in parallel
+    const runPromises = providers.map(async (provider) => {
+      const promptRunId = generateId();
+      try {
+        const response = await runPromptAgainstLLM(p.promptText, provider);
 
-      if (isLLMError(response)) {
+        if (isLLMError(response)) {
+          await db.insert(schema.promptRun).values({
+            id: promptRunId,
+            promptId: p.id,
+            llmProvider: provider,
+            error: response.error,
+            executedAt: new Date(),
+          });
+
+          console.log(`    [${provider}] ❌ Error: ${response.error}`);
+          return {
+            promptId: p.id,
+            promptRunId,
+            provider,
+            success: false,
+            error: response.error,
+          };
+        }
+
         await db.insert(schema.promptRun).values({
           id: promptRunId,
           promptId: p.id,
-          llmProvider: "chatgpt",
-          error: response.error,
+          llmProvider: provider,
+          responseText: response.text,
+          responseMetadata: response.metadata,
+          durationMs: response.durationMs,
           executedAt: new Date(),
         });
 
-        console.log(`    ❌ Error: ${response.error}`);
-        results.push({
+        const analysis = analyzeResponseForMentions(
+          response.text,
+          domainRecord.domain
+        );
+
+        await db.insert(schema.mentionAnalysis).values({
+          id: generateId(),
+          promptRunId,
+          domainId: domainId,
+          mentioned: analysis.mentioned,
+          position: analysis.position,
+          contextSnippet: analysis.contextSnippet,
+        });
+
+        const mentionStatus = analysis.mentioned
+          ? "✅ Mentioned"
+          : "⬜ Not mentioned";
+        console.log(`    [${provider}] ${mentionStatus} (${response.durationMs}ms)`);
+
+        return {
           promptId: p.id,
           promptRunId,
-          provider: "chatgpt",
+          provider,
+          success: true,
+          mentioned: analysis.mentioned,
+          responsePreview: response.text.slice(0, 200),
+        };
+      } catch (error) {
+        console.log(
+          `    [${provider}] ❌ Error: ${error instanceof Error ? error.message : "Unknown"}`
+        );
+        return {
+          promptId: p.id,
+          promptRunId,
+          provider,
           success: false,
-          error: response.error,
-        });
-        continue;
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
       }
+    });
 
-      await db.insert(schema.promptRun).values({
-        id: promptRunId,
-        promptId: p.id,
-        llmProvider: "chatgpt",
-        responseText: response.text,
-        responseMetadata: response.metadata,
-        durationMs: response.durationMs,
-        executedAt: new Date(),
-      });
+    const promptResults = await Promise.all(runPromises);
+    results.push(...promptResults);
 
-      const analysis = analyzeResponseForMentions(
-        response.text,
-        domainRecord.domain
-      );
-
-      await db.insert(schema.mentionAnalysis).values({
-        id: generateId(),
-        promptRunId,
-        domainId: domainId,
-        mentioned: analysis.mentioned,
-        position: analysis.position,
-        contextSnippet: analysis.contextSnippet,
-      });
-
-      const mentionStatus = analysis.mentioned
-        ? "✅ Mentioned"
-        : "⬜ Not mentioned";
-      console.log(`    ${mentionStatus} (${response.durationMs}ms)`);
-
-      results.push({
-        promptId: p.id,
-        promptRunId,
-        provider: "chatgpt",
-        success: true,
-        mentioned: analysis.mentioned,
-        responsePreview: response.text.slice(0, 200),
-      });
-    } catch (error) {
-      console.log(
-        `    ❌ Error: ${error instanceof Error ? error.message : "Unknown"}`
-      );
-      results.push({
-        promptId: p.id,
-        promptRunId,
-        provider: "chatgpt",
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-
-    // Rate limiting delay
+    // Rate limiting delay between prompts
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 

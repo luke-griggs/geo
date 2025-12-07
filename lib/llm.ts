@@ -1,5 +1,3 @@
-import { generateId } from "./id";
-
 export type LLMProvider =
   | "chatgpt"
   | "claude"
@@ -38,18 +36,25 @@ export async function runOpenAI(
   const startTime = Date.now();
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-5.1",
-        tools: [{ type: "web_search" }],
-        input: `System: You are a helpful assistant providing information about products, services, and recommendations.
-
-        User: ${promptText}`,
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a helpful assistant providing information about products, services, and recommendations.",
+          },
+          {
+            role: "user",
+            content: promptText,
+          },
+        ],
       }),
     });
 
@@ -63,11 +68,11 @@ export async function runOpenAI(
     const data = await response.json();
 
     return {
-      text: data.output_text || "",
+      text: data.choices[0]?.message?.content || "",
       metadata: {
         model: data.model,
         tokensUsed: data.usage?.total_tokens,
-        finishReason: data.stop_reason,
+        finishReason: data.choices[0]?.finish_reason,
       },
       durationMs,
     };

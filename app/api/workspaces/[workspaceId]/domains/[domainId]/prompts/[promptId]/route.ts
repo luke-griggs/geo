@@ -119,7 +119,14 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { promptText, category, location, isActive } = body;
+    const {
+      promptText,
+      category,
+      location,
+      isActive,
+      isArchived,
+      selectedProviders,
+    } = body;
 
     const updateData: {
       promptText?: string;
@@ -131,12 +138,17 @@ export async function PUT(
         | "problem_solution";
       location?: string | null;
       isActive?: boolean;
+      isArchived?: boolean;
+      selectedProviders?: string[];
     } = {};
 
     if (promptText !== undefined) updateData.promptText = promptText.trim();
     if (category !== undefined) updateData.category = category;
     if (location !== undefined) updateData.location = location;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (isArchived !== undefined) updateData.isArchived = isArchived;
+    if (selectedProviders !== undefined)
+      updateData.selectedProviders = selectedProviders;
 
     const [updated] = await db
       .update(prompt)

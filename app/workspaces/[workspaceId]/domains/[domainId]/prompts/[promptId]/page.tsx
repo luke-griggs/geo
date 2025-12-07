@@ -27,9 +27,10 @@ export default async function PromptPage({ params }: PageProps) {
     with: {
       runs: {
         orderBy: [desc(promptRun.executedAt)],
-        limit: 10,
+        limit: 50,
         with: {
           mentionAnalyses: true,
+          brandMentions: true,
         },
       },
     },
@@ -49,6 +50,8 @@ export default async function PromptPage({ params }: PageProps) {
     text: promptData.promptText,
     createdAt: promptData.createdAt,
     status: (promptData.isActive ? "active" : "inactive") as "active" | "inactive",
+    isArchived: promptData.isArchived,
+    selectedProviders: (promptData.selectedProviders as string[]) || ["chatgpt"],
     runs: promptData.runs.map((run) => ({
       id: run.id,
       executedAt: run.executedAt,
@@ -57,6 +60,11 @@ export default async function PromptPage({ params }: PageProps) {
       model: run.llmProvider,
       response: run.responseText,
       mentions: run.mentionAnalyses.filter((m) => m.mentioned).length,
+      brandMentions: run.brandMentions.map(bm => ({
+        brand: bm.brandName,
+        position: bm.position,
+        mentioned: bm.mentioned,
+      })),
       sentiment: run.mentionAnalyses.length > 0
         ? run.mentionAnalyses.reduce((acc, m) => acc + (parseFloat(m.sentimentScore || "0")), 0) / run.mentionAnalyses.length
         : null,

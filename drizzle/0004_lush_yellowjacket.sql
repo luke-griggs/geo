@@ -1,0 +1,1 @@
+ALTER TABLE "prompt" ADD COLUMN "selected_providers" jsonb DEFAULT '["chatgpt"]'::jsonb;

@@ -162,7 +162,11 @@ export const prompt = pgTable(
       .notNull()
       .references(() => domain.id, { onDelete: "cascade" }),
     isActive: boolean("is_active").default(true).notNull(),
+    isArchived: boolean("is_archived").default(false).notNull(),
     location: text("location"), // e.g., "Chicago, US" for location-based queries
+    selectedProviders: jsonb("selected_providers")
+      .$type<string[]>()
+      .default(["chatgpt"]),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -217,6 +221,26 @@ export const mentionAnalysis = pgTable(
     index("mentionAnalysis_promptRunId_idx").on(table.promptRunId),
     index("mentionAnalysis_domainId_idx").on(table.domainId),
     index("mentionAnalysis_mentioned_idx").on(table.mentioned),
+  ]
+);
+
+export const brandMention = pgTable(
+  "brand_mention",
+  {
+    id: text("id").primaryKey(),
+    promptRunId: text("prompt_run_id")
+      .notNull()
+      .references(() => promptRun.id, { onDelete: "cascade" }),
+    brandName: text("brand_name").notNull(),
+    mentioned: boolean("mentioned").default(false).notNull(),
+    position: integer("position"), // 1st, 2nd, 3rd mention position
+    sentimentScore: decimal("sentiment_score", { precision: 3, scale: 2 }), // -1.00 to 1.00
+    citationUrl: text("citation_url"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("brandMention_promptRunId_idx").on(table.promptRunId),
+    index("brandMention_brandName_idx").on(table.brandName),
   ]
 );
 
@@ -300,6 +324,7 @@ export const promptRunRelations = relations(promptRun, ({ one, many }) => ({
     references: [prompt.id],
   }),
   mentionAnalyses: many(mentionAnalysis),
+  brandMentions: many(brandMention),
 }));
 
 export const mentionAnalysisRelations = relations(
@@ -315,6 +340,13 @@ export const mentionAnalysisRelations = relations(
     }),
   })
 );
+
+export const brandMentionRelations = relations(brandMention, ({ one }) => ({
+  promptRun: one(promptRun, {
+    fields: [brandMention.promptRunId],
+    references: [promptRun.id],
+  }),
+}));
 
 export const dailyMetricsRelations = relations(dailyMetrics, ({ one }) => ({
   domain: one(domain, {

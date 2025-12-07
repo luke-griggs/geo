@@ -1,0 +1,1 @@
+ALTER TABLE "prompt" ADD COLUMN "is_archived" boolean DEFAULT false NOT NULL;
