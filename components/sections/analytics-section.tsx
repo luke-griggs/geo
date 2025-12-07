@@ -1,32 +1,45 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Minus, ArrowUpRight, Download } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  ArrowUpRight,
+  Download,
+} from "lucide-react";
+
+interface StatItem {
+  label: string;
+  value: string;
+  change: string;
+  trend: "up" | "down" | "neutral";
+}
 
 // Placeholder analytics data
-const stats = [
+const stats: StatItem[] = [
   {
     label: "Total Mentions",
     value: "2,847",
     change: "+12.5%",
-    trend: "up" as const,
+    trend: "up",
   },
   {
     label: "Avg. Position",
     value: "1.4",
     change: "-0.2",
-    trend: "up" as const,
+    trend: "up",
   },
   {
     label: "Visibility Score",
     value: "68.3%",
     change: "+5.2%",
-    trend: "up" as const,
+    trend: "up",
   },
   {
     label: "Sentiment Score",
     value: "87",
     change: "0",
-    trend: "neutral" as const,
+    trend: "neutral",
   },
 ];
 
@@ -89,7 +102,9 @@ export function AnalyticsSection() {
           >
             <p className="text-sm font-medium text-gray-500">{stat.label}</p>
             <div className="flex items-end justify-between mt-2">
-              <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {stat.value}
+              </p>
               <div
                 className={`flex items-center gap-1 text-sm font-medium ${
                   stat.trend === "up"
@@ -118,7 +133,9 @@ export function AnalyticsSection() {
         {/* Mentions over time chart placeholder */}
         <div className="p-5 bg-white border border-gray-200 rounded-xl">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900">Mentions Over Time</h3>
+            <h3 className="text-sm font-semibold text-gray-900">
+              Mentions Over Time
+            </h3>
             <button className="text-xs text-gray-500 hover:text-gray-700">
               View details <ArrowUpRight className="h-3 w-3 inline" />
             </button>
@@ -131,7 +148,9 @@ export function AnalyticsSection() {
         {/* Model breakdown */}
         <div className="p-5 bg-white border border-gray-200 rounded-xl">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900">Mentions by Model</h3>
+            <h3 className="text-sm font-semibold text-gray-900">
+              Mentions by Model
+            </h3>
             <button className="text-xs text-gray-500 hover:text-gray-700">
               View details <ArrowUpRight className="h-3 w-3 inline" />
             </button>
@@ -159,7 +178,9 @@ export function AnalyticsSection() {
         {/* Top performing prompts */}
         <div className="p-5 bg-white border border-gray-200 rounded-xl col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900">Top Performing Prompts</h3>
+            <h3 className="text-sm font-semibold text-gray-900">
+              Top Performing Prompts
+            </h3>
             <button className="text-xs text-gray-500 hover:text-gray-700">
               View all <ArrowUpRight className="h-3 w-3 inline" />
             </button>
@@ -197,4 +218,3 @@ export function AnalyticsSection() {
     </div>
   );
 }
-

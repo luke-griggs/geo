@@ -8,6 +8,13 @@
       "when": 1765070582231,
       "tag": "0000_outgoing_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1765077209319,
+      "tag": "0001_large_killraven",
+      "breakpoints": true
     }
   ]
 }

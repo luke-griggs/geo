@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "prompts:run": "tsx scripts/run-prompts.ts",
+    "prompts:run:domain": "tsx scripts/run-prompts.ts --domain"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
