@@ -1,48 +1,43 @@
-import { NextRequest, NextResponse } from 'next/server';
-import db from '@/db';
-import { prompt, domain, workspace } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { NextRequest, NextResponse } from "next/server";
+import db from "@/db";
+import { prompt, domain, workspace } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 
-type Params = Promise<{ workspaceId: string; domainId: string; promptId: string }>;
+type Params = Promise<{
+  workspaceId: string;
+  domainId: string;
+  promptId: string;
+}>;
 
 // Helper to verify ownership
 async function verifyOwnership(
-  workspaceId: string, 
-  domainId: string, 
-  promptId: string, 
+  workspaceId: string,
+  domainId: string,
+  promptId: string,
   userId: string
 ) {
   const workspaceExists = await db.query.workspace.findFirst({
-    where: and(
-      eq(workspace.id, workspaceId),
-      eq(workspace.userId, userId)
-    ),
+    where: and(eq(workspace.id, workspaceId), eq(workspace.userId, userId)),
   });
 
   if (!workspaceExists) {
-    return { error: 'Workspace not found', status: 404 };
+    return { error: "Workspace not found", status: 404 };
   }
 
   const domainExists = await db.query.domain.findFirst({
-    where: and(
-      eq(domain.id, domainId),
-      eq(domain.workspaceId, workspaceId)
-    ),
+    where: and(eq(domain.id, domainId), eq(domain.workspaceId, workspaceId)),
   });
 
   if (!domainExists) {
-    return { error: 'Domain not found', status: 404 };
+    return { error: "Domain not found", status: 404 };
   }
 
   const promptExists = await db.query.prompt.findFirst({
-    where: and(
-      eq(prompt.id, promptId),
-      eq(prompt.domainId, domainId)
-    ),
+    where: and(eq(prompt.id, promptId), eq(prompt.domainId, domainId)),
   });
 
   if (!promptExists) {
-    return { error: 'Prompt not found', status: 404 };
+    return { error: "Prompt not found", status: 404 };
   }
 
   return { prompt: promptExists };
@@ -55,17 +50,19 @@ export async function GET(
 ) {
   try {
     const { workspaceId, domainId, promptId } = await params;
-    const userId = request.headers.get('x-user-id');
-    
+    const userId = request.headers.get("x-user-id");
+
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const result = await verifyOwnership(workspaceId, domainId, promptId, userId);
-    if ('error' in result) {
+    const result = await verifyOwnership(
+      workspaceId,
+      domainId,
+      promptId,
+      userId
+    );
+    if ("error" in result) {
       return NextResponse.json(
         { error: result.error },
         { status: result.status }
@@ -87,9 +84,9 @@ export async function GET(
 
     return NextResponse.json({ prompt: promptWithRuns });
   } catch (error) {
-    console.error('Error fetching prompt:', error);
+    console.error("Error fetching prompt:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch prompt' },
+      { error: "Failed to fetch prompt" },
       { status: 500 }
     );
   }
@@ -102,17 +99,19 @@ export async function PUT(
 ) {
   try {
     const { workspaceId, domainId, promptId } = await params;
-    const userId = request.headers.get('x-user-id');
-    
+    const userId = request.headers.get("x-user-id");
+
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const result = await verifyOwnership(workspaceId, domainId, promptId, userId);
-    if ('error' in result) {
+    const result = await verifyOwnership(
+      workspaceId,
+      domainId,
+      promptId,
+      userId
+    );
+    if ("error" in result) {
       return NextResponse.json(
         { error: result.error },
         { status: result.status }
@@ -124,7 +123,12 @@ export async function PUT(
 
     const updateData: {
       promptText?: string;
-      category?: 'brand' | 'product' | 'comparison' | 'recommendation' | 'problem_solution';
+      category?:
+        | "brand"
+        | "product"
+        | "comparison"
+        | "recommendation"
+        | "problem_solution";
       location?: string | null;
       isActive?: boolean;
     } = {};
@@ -142,9 +146,9 @@ export async function PUT(
 
     return NextResponse.json({ prompt: updated });
   } catch (error) {
-    console.error('Error updating prompt:', error);
+    console.error("Error updating prompt:", error);
     return NextResponse.json(
-      { error: 'Failed to update prompt' },
+      { error: "Failed to update prompt" },
       { status: 500 }
     );
   }
@@ -157,17 +161,19 @@ export async function DELETE(
 ) {
   try {
     const { workspaceId, domainId, promptId } = await params;
-    const userId = request.headers.get('x-user-id');
-    
+    const userId = request.headers.get("x-user-id");
+
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const result = await verifyOwnership(workspaceId, domainId, promptId, userId);
-    if ('error' in result) {
+    const result = await verifyOwnership(
+      workspaceId,
+      domainId,
+      promptId,
+      userId
+    );
+    if ("error" in result) {
       return NextResponse.json(
         { error: result.error },
         { status: result.status }
@@ -178,11 +184,10 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting prompt:', error);
+    console.error("Error deleting prompt:", error);
     return NextResponse.json(
-      { error: 'Failed to delete prompt' },
+      { error: "Failed to delete prompt" },
       { status: 500 }
     );
   }
 }
-

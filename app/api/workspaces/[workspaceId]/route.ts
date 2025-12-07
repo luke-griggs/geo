@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import db from '@/db';
-import { workspace } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { NextRequest, NextResponse } from "next/server";
+import db from "@/db";
+import { workspace } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 type Params = Promise<{ workspaceId: string }>;
 
@@ -12,19 +14,18 @@ export async function GET(
 ) {
   try {
     const { workspaceId } = await params;
-    const userId = request.headers.get('x-user-id');
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const result = await db.query.workspace.findFirst({
       where: and(
         eq(workspace.id, workspaceId),
-        eq(workspace.userId, userId)
+        eq(workspace.userId, session.user.id)
       ),
       with: {
         domains: {
@@ -37,16 +38,16 @@ export async function GET(
 
     if (!result) {
       return NextResponse.json(
-        { error: 'Workspace not found' },
+        { error: "Workspace not found" },
         { status: 404 }
       );
     }
 
     return NextResponse.json({ workspace: result });
   } catch (error) {
-    console.error('Error fetching workspace:', error);
+    console.error("Error fetching workspace:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch workspace' },
+      { error: "Failed to fetch workspace" },
       { status: 500 }
     );
   }
@@ -59,13 +60,12 @@ export async function PUT(
 ) {
   try {
     const { workspaceId } = await params;
-    const userId = request.headers.get('x-user-id');
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -75,13 +75,13 @@ export async function PUT(
     const existing = await db.query.workspace.findFirst({
       where: and(
         eq(workspace.id, workspaceId),
-        eq(workspace.userId, userId)
+        eq(workspace.userId, session.user.id)
       ),
     });
 
     if (!existing) {
       return NextResponse.json(
-        { error: 'Workspace not found' },
+        { error: "Workspace not found" },
         { status: 404 }
       );
     }
@@ -94,9 +94,9 @@ export async function PUT(
 
     return NextResponse.json({ workspace: updated });
   } catch (error) {
-    console.error('Error updating workspace:', error);
+    console.error("Error updating workspace:", error);
     return NextResponse.json(
-      { error: 'Failed to update workspace' },
+      { error: "Failed to update workspace" },
       { status: 500 }
     );
   }
@@ -109,26 +109,25 @@ export async function DELETE(
 ) {
   try {
     const { workspaceId } = await params;
-    const userId = request.headers.get('x-user-id');
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check ownership
     const existing = await db.query.workspace.findFirst({
       where: and(
         eq(workspace.id, workspaceId),
-        eq(workspace.userId, userId)
+        eq(workspace.userId, session.user.id)
       ),
     });
 
     if (!existing) {
       return NextResponse.json(
-        { error: 'Workspace not found' },
+        { error: "Workspace not found" },
         { status: 404 }
       );
     }
@@ -137,11 +136,10 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting workspace:', error);
+    console.error("Error deleting workspace:", error);
     return NextResponse.json(
-      { error: 'Failed to delete workspace' },
+      { error: "Failed to delete workspace" },
       { status: 500 }
     );
   }
 }
-

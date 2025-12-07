@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   PanelLeft,
   PanelRight,
@@ -27,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useSession, signOut } from "@/lib/auth-client";
 
 type NavSection = "prompts" | "mentions" | "analytics" | "sources";
 
@@ -36,13 +38,6 @@ const navItems = [
   { id: "analytics" as const, label: "Analytics", icon: BarChart3 },
   { id: "sources" as const, label: "Sources", icon: Database },
 ];
-
-// Placeholder user data - replace with actual auth when ready
-const mockUser = {
-  name: "Alex Johnson",
-  email: "alex@example.com",
-  image: null as string | null,
-};
 
 function getInitials(name?: string | null) {
   if (!name) return "U";
@@ -60,13 +55,19 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { data: session } = useSession();
+
+  const user = session?.user ?? {
+    name: "User",
+    email: "",
+    image: null,
+  };
 
   const handleLogout = async () => {
-    // Placeholder logout - replace with actual auth
-    console.log("Logout clicked");
-    // await authClient.signOut();
-    // window.location.href = "/";
+    await signOut();
+    router.push("/");
   };
 
   return (
@@ -141,9 +142,9 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
               <DropdownMenuTrigger asChild>
                 <button className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
                   <Avatar className="h-7 w-7 border border-gray-200">
-                    <AvatarImage src={mockUser.image || undefined} />
+                    <AvatarImage src={user.image || undefined} />
                     <AvatarFallback className="bg-gray-100 text-gray-600 text-xs">
-                      {getInitials(mockUser.name)}
+                      {getInitials(user.name)}
                     </AvatarFallback>
                   </Avatar>
                 </button>
@@ -155,10 +156,10 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
               >
                 <div className="px-2 py-1.5">
                   <p className="text-sm font-medium text-gray-900">
-                    {mockUser.name}
+                    {user.name}
                   </p>
                   <p className="text-xs text-gray-500 truncate">
-                    {mockUser.email}
+                    {user.email}
                   </p>
                 </div>
                 <DropdownMenuSeparator />
@@ -244,14 +245,14 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
               <DropdownMenuTrigger asChild>
                 <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 transition-colors cursor-pointer">
                   <Avatar className="h-7 w-7 border border-gray-200 flex-shrink-0">
-                    <AvatarImage src={mockUser.image || undefined} />
+                    <AvatarImage src={user.image || undefined} />
                     <AvatarFallback className="bg-gray-100 text-gray-600 text-xs">
-                      {getInitials(mockUser.name)}
+                      {getInitials(user.name)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 text-left min-w-0">
                     <p className="font-medium text-gray-900 truncate">
-                      {mockUser.name}
+                      {user.name}
                     </p>
                   </div>
                   <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -264,10 +265,10 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
               >
                 <div className="px-2 py-1.5">
                   <p className="text-sm font-medium text-gray-900">
-                    {mockUser.name}
+                    {user.name}
                   </p>
                   <p className="text-xs text-gray-500 truncate">
-                    {mockUser.email}
+                    {user.email}
                   </p>
                 </div>
                 <DropdownMenuSeparator />
@@ -293,4 +294,3 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
 }
 
 export type { NavSection };
-

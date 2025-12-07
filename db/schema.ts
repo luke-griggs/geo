@@ -1,22 +1,32 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, integer, jsonb, decimal, pgEnum } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  index,
+  integer,
+  jsonb,
+  decimal,
+  pgEnum,
+} from "drizzle-orm/pg-core";
 
 // Enums
-export const promptCategoryEnum = pgEnum('prompt_category', [
-  'brand',
-  'product',
-  'comparison',
-  'recommendation',
-  'problem_solution'
+export const promptCategoryEnum = pgEnum("prompt_category", [
+  "brand",
+  "product",
+  "comparison",
+  "recommendation",
+  "problem_solution",
 ]);
 
-export const llmProviderEnum = pgEnum('llm_provider', [
-  'chatgpt',
-  'claude',
-  'perplexity',
-  'gemini',
-  'grok',
-  'deepseek'
+export const llmProviderEnum = pgEnum("llm_provider", [
+  "chatgpt",
+  "claude",
+  "perplexity",
+  "gemini",
+  "grok",
+  "deepseek",
 ]);
 
 // ============================================
@@ -52,7 +62,7 @@ export const session = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
   },
-  (table) => [index("session_userId_idx").on(table.userId)],
+  (table) => [index("session_userId_idx").on(table.userId)]
 );
 
 export const account = pgTable(
@@ -76,7 +86,7 @@ export const account = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("account_userId_idx").on(table.userId)],
+  (table) => [index("account_userId_idx").on(table.userId)]
 );
 
 export const verification = pgTable(
@@ -92,7 +102,7 @@ export const verification = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("verification_identifier_idx").on(table.identifier)],
+  (table) => [index("verification_identifier_idx").on(table.identifier)]
 );
 
 // ============================================
@@ -117,7 +127,7 @@ export const workspace = pgTable(
   (table) => [
     index("workspace_userId_idx").on(table.userId),
     index("workspace_slug_idx").on(table.slug),
-  ],
+  ]
 );
 
 export const domain = pgTable(
@@ -139,7 +149,7 @@ export const domain = pgTable(
   (table) => [
     index("domain_workspaceId_idx").on(table.workspaceId),
     index("domain_domain_idx").on(table.domain),
-  ],
+  ]
 );
 
 export const prompt = pgTable(
@@ -147,7 +157,7 @@ export const prompt = pgTable(
   {
     id: text("id").primaryKey(),
     promptText: text("prompt_text").notNull(),
-    category: promptCategoryEnum("category").default('brand'),
+    category: promptCategoryEnum("category").default("brand"),
     domainId: text("domain_id")
       .notNull()
       .references(() => domain.id, { onDelete: "cascade" }),
@@ -162,7 +172,7 @@ export const prompt = pgTable(
   (table) => [
     index("prompt_domainId_idx").on(table.domainId),
     index("prompt_isActive_idx").on(table.isActive),
-  ],
+  ]
 );
 
 export const promptRun = pgTable(
@@ -183,7 +193,7 @@ export const promptRun = pgTable(
     index("promptRun_promptId_idx").on(table.promptId),
     index("promptRun_executedAt_idx").on(table.executedAt),
     index("promptRun_llmProvider_idx").on(table.llmProvider),
-  ],
+  ]
 );
 
 export const mentionAnalysis = pgTable(
@@ -207,7 +217,7 @@ export const mentionAnalysis = pgTable(
     index("mentionAnalysis_promptRunId_idx").on(table.promptRunId),
     index("mentionAnalysis_domainId_idx").on(table.domainId),
     index("mentionAnalysis_mentioned_idx").on(table.mentioned),
-  ],
+  ]
 );
 
 // Aggregated daily metrics for fast dashboard queries
@@ -231,7 +241,7 @@ export const dailyMetrics = pgTable(
     index("dailyMetrics_domainId_idx").on(table.domainId),
     index("dailyMetrics_date_idx").on(table.date),
     index("dailyMetrics_domainId_date_idx").on(table.domainId, table.date),
-  ],
+  ]
 );
 
 // ============================================
@@ -292,16 +302,19 @@ export const promptRunRelations = relations(promptRun, ({ one, many }) => ({
   mentionAnalyses: many(mentionAnalysis),
 }));
 
-export const mentionAnalysisRelations = relations(mentionAnalysis, ({ one }) => ({
-  promptRun: one(promptRun, {
-    fields: [mentionAnalysis.promptRunId],
-    references: [promptRun.id],
-  }),
-  domain: one(domain, {
-    fields: [mentionAnalysis.domainId],
-    references: [domain.id],
-  }),
-}));
+export const mentionAnalysisRelations = relations(
+  mentionAnalysis,
+  ({ one }) => ({
+    promptRun: one(promptRun, {
+      fields: [mentionAnalysis.promptRunId],
+      references: [promptRun.id],
+    }),
+    domain: one(domain, {
+      fields: [mentionAnalysis.domainId],
+      references: [domain.id],
+    }),
+  })
+);
 
 export const dailyMetricsRelations = relations(dailyMetrics, ({ one }) => ({
   domain: one(domain, {

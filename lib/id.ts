@@ -13,9 +13,9 @@ export function slugify(text: string): string {
   return text
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 /**
@@ -26,4 +26,3 @@ export function generateUniqueSlug(text: string): string {
   const randomSuffix = crypto.randomUUID().slice(0, 8);
   return `${baseSlug}-${randomSuffix}`;
 }
-

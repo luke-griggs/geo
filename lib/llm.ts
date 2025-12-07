@@ -1,6 +1,12 @@
-import { generateId } from './id';
+import { generateId } from "./id";
 
-export type LLMProvider = 'chatgpt' | 'claude' | 'perplexity' | 'gemini' | 'grok' | 'deepseek';
+export type LLMProvider =
+  | "chatgpt"
+  | "claude"
+  | "perplexity"
+  | "gemini"
+  | "grok"
+  | "deepseek";
 
 export interface LLMResponse {
   text: string;
@@ -20,36 +26,30 @@ export interface LLMError {
 /**
  * Run a prompt against OpenAI's ChatGPT
  */
-export async function runOpenAI(promptText: string): Promise<LLMResponse | LLMError> {
+export async function runOpenAI(
+  promptText: string
+): Promise<LLMResponse | LLMError> {
   const apiKey = process.env.OPENAI_API_KEY;
-  
+
   if (!apiKey) {
-    return { error: 'OPENAI_API_KEY not configured', provider: 'chatgpt' };
+    return { error: "OPENAI_API_KEY not configured", provider: "chatgpt" };
   }
 
   const startTime = Date.now();
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Using gpt-4o-mini for cost efficiency
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful assistant providing information about products, services, and recommendations. Be thorough and mention specific brands, websites, and tools when relevant.',
-          },
-          {
-            role: 'user',
-            content: promptText,
-          },
-        ],
-        max_tokens: 2000,
-        temperature: 0.7,
+        model: "gpt-5.1",
+        tools: [{ type: "web_search" }],
+        input: `System: You are a helpful assistant providing information about products, services, and recommendations.
+
+        User: ${promptText}`,
       }),
     });
 
@@ -57,25 +57,24 @@ export async function runOpenAI(promptText: string): Promise<LLMResponse | LLMEr
 
     if (!response.ok) {
       const error = await response.text();
-      return { error: `OpenAI API error: ${error}`, provider: 'chatgpt' };
+      return { error: `OpenAI API error: ${error}`, provider: "chatgpt" };
     }
 
     const data = await response.json();
-    const choice = data.choices?.[0];
 
     return {
-      text: choice?.message?.content || '',
+      text: data.output_text || "",
       metadata: {
         model: data.model,
         tokensUsed: data.usage?.total_tokens,
-        finishReason: choice?.finish_reason,
+        finishReason: data.stop_reason,
       },
       durationMs,
     };
   } catch (error) {
-    return { 
-      error: error instanceof Error ? error.message : 'Unknown error', 
-      provider: 'chatgpt' 
+    return {
+      error: error instanceof Error ? error.message : "Unknown error",
+      provider: "chatgpt",
     };
   }
 }
@@ -85,21 +84,21 @@ export async function runOpenAI(promptText: string): Promise<LLMResponse | LLMEr
  * Currently only OpenAI is implemented, but this can be extended
  */
 export async function runPromptAgainstLLM(
-  promptText: string, 
+  promptText: string,
   provider: LLMProvider
 ): Promise<LLMResponse | LLMError> {
   switch (provider) {
-    case 'chatgpt':
+    case "chatgpt":
       return runOpenAI(promptText);
-    
+
     // Add other providers here as needed
-    case 'claude':
-    case 'perplexity':
-    case 'gemini':
-    case 'grok':
-    case 'deepseek':
+    case "claude":
+    case "perplexity":
+    case "gemini":
+    case "grok":
+    case "deepseek":
       return { error: `Provider ${provider} not yet implemented`, provider };
-    
+
     default:
       return { error: `Unknown provider: ${provider}`, provider };
   }
@@ -108,7 +107,8 @@ export async function runPromptAgainstLLM(
 /**
  * Check if a response contains an error
  */
-export function isLLMError(response: LLMResponse | LLMError): response is LLMError {
-  return 'error' in response;
+export function isLLMError(
+  response: LLMResponse | LLMError
+): response is LLMError {
+  return "error" in response;
 }
-
