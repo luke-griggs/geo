@@ -33,6 +33,8 @@ interface Citation {
   brandName: string;
   url: string | null;
   domain: string | null;
+  title?: string;
+  snippet?: string;
 }
 
 interface Query {
@@ -198,16 +200,12 @@ function SourceIcon({ source }: { source: string }) {
 
   if (source.toLowerCase() === "chatgpt" || source.toLowerCase() === "openai") {
     return (
-      <div
-        className={`w-8 h-8 rounded-full ${bgColor} flex items-center justify-center`}
-      >
-        <svg
-          viewBox="0 0 24 24"
-          className="w-5 h-5 text-white"
-          fill="currentColor"
-        >
-          <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729z" />
-        </svg>
+      <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+        <img
+          src="https://www.google.com/s2/favicons?domain=https://chatgpt.com&sz=64"
+          alt="ChatGPT"
+          className="w-8 h-8"
+        />
       </div>
     );
   }
@@ -223,31 +221,46 @@ function SourceIcon({ source }: { source: string }) {
   );
 }
 
-function CitationDot({ domain }: { domain: string | null }) {
-  // Generate a consistent color based on domain
-  const colors = [
-    "bg-teal-500",
-    "bg-blue-500",
-    "bg-orange-500",
-    "bg-purple-500",
-    "bg-emerald-500",
-    "bg-red-500",
-    "bg-yellow-400",
-    "bg-pink-500",
-    "bg-indigo-500",
-  ];
-  const colorIndex = domain
-    ? Math.abs(
-        domain.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
-      ) % colors.length
-    : 0;
+function CitationIcon({ domain }: { domain: string | null }) {
+  if (!domain) {
+    return (
+      <div
+        className="w-5 h-5 rounded-full bg-gray-200 ring-2 ring-white"
+        title="Unknown"
+      />
+    );
+  }
 
   return (
     <div
-      className={`w-5 h-5 rounded-full ${colors[colorIndex]} ring-2 ring-white`}
-      title={domain || "Unknown"}
-    />
+      className="w-5 h-5 rounded-full ring-2 ring-white overflow-hidden bg-gray-100 flex items-center justify-center"
+      title={domain}
+    >
+      <img
+        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+        alt={domain}
+        className="w-5 h-5"
+        onError={(e) => {
+          // Fallback to first letter if favicon fails
+          const target = e.target as HTMLImageElement;
+          target.style.display = "none";
+          const parent = target.parentElement;
+          if (parent) {
+            parent.innerHTML = `<span class="text-[8px] font-bold text-gray-500">${domain
+              .charAt(0)
+              .toUpperCase()}</span>`;
+          }
+        }}
+      />
+    </div>
   );
+}
+
+interface AggregateStats {
+  totalMentions: number;
+  totalQueries: number;
+  chartData: { date: string; count: number }[];
+  platformData: { name: string; mentions: number; percentage: number }[];
 }
 
 export function MentionsSection({
@@ -258,9 +271,15 @@ export function MentionsSection({
   const [queries, setQueries] = useState<Query[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
-    limit: 50,
+    limit: 10,
     total: 0,
     totalPages: 0,
+  });
+  const [aggregateStats, setAggregateStats] = useState<AggregateStats>({
+    totalMentions: 0,
+    totalQueries: 0,
+    chartData: [],
+    platformData: [],
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -326,6 +345,9 @@ export function MentionsSection({
       if (data.pagination) {
         setPagination(data.pagination);
       }
+      if (data.stats) {
+        setAggregateStats(data.stats);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -353,53 +375,20 @@ export function MentionsSection({
     );
   }, [queries, searchQuery]);
 
-  // Calculate stats
+  // Use aggregate stats from API (calculated from ALL data, not just current page)
   const stats = useMemo(() => {
-    const totalMentions = queries.filter((q) => q.mentioned.count > 0).length;
-    const totalQueries = queries.length;
-
-    // Group by date for chart
-    const byDate: Record<string, number> = {};
-    queries.forEach((q) => {
-      const date = q.date.split("T")[0];
-      byDate[date] = (byDate[date] || 0) + (q.mentioned.count > 0 ? 1 : 0);
-    });
-
-    const chartData = Object.entries(byDate)
-      .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    // Calculate change vs previous period (simplified)
-    const previousMentions = Math.max(0, totalMentions - 2); // Placeholder
-    const change = totalMentions - previousMentions;
-
-    // Platform stats
-    const byPlatform: Record<string, { total: number; mentions: number }> = {};
-    queries.forEach((q) => {
-      if (!byPlatform[q.source]) {
-        byPlatform[q.source] = { total: 0, mentions: 0 };
-      }
-      byPlatform[q.source].total++;
-      if (q.mentioned.count > 0) {
-        byPlatform[q.source].mentions++;
-      }
-    });
-
-    const platformData = Object.entries(byPlatform).map(([name, data]) => ({
-      name,
-      mentions: data.mentions,
-      percentage:
-        data.total > 0 ? Math.round((data.mentions / data.total) * 100) : 0,
-    }));
+    // Calculate change vs previous period (simplified placeholder)
+    const previousMentions = Math.max(0, aggregateStats.totalMentions - 2);
+    const change = aggregateStats.totalMentions - previousMentions;
 
     return {
-      totalMentions,
-      totalQueries,
-      chartData,
+      totalMentions: aggregateStats.totalMentions,
+      totalQueries: aggregateStats.totalQueries,
+      chartData: aggregateStats.chartData,
       change,
-      platformData,
+      platformData: aggregateStats.platformData,
     };
-  }, [queries]);
+  }, [aggregateStats]);
 
   // Time period options
   const timePeriodLabel =
@@ -740,7 +729,7 @@ export function MentionsSection({
                               {query.citations.length > 0 ? (
                                 <div className="flex items-center -space-x-1.5">
                                   {query.citations.slice(0, 3).map((c, i) => (
-                                    <CitationDot key={i} domain={c.domain} />
+                                    <CitationIcon key={i} domain={c.domain} />
                                   ))}
                                   {query.citations.length > 3 && (
                                     <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
@@ -764,36 +753,63 @@ export function MentionsSection({
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4 px-2">
-              <span className="text-sm text-gray-500">
-                Page {pagination.page} of {pagination.totalPages}
+            <div className="flex items-center gap-2 mt-4 px-2">
+              {/* First page */}
+              <button
+                onClick={() =>
+                  setPagination((p) => ({
+                    ...p,
+                    page: 1,
+                  }))
+                }
+                disabled={pagination.page <= 1}
+                className="w-8 h-8 flex items-center justify-center text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                «
+              </button>
+              {/* Previous page */}
+              <button
+                onClick={() =>
+                  setPagination((p) => ({
+                    ...p,
+                    page: Math.max(1, p.page - 1),
+                  }))
+                }
+                disabled={pagination.page <= 1}
+                className="w-8 h-8 flex items-center justify-center text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              {/* Page indicator */}
+              <span className="text-sm text-gray-600 px-2">
+                {pagination.page} of {pagination.totalPages}
               </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() =>
-                    setPagination((p) => ({
-                      ...p,
-                      page: Math.max(1, p.page - 1),
-                    }))
-                  }
-                  disabled={pagination.page <= 1}
-                  className="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() =>
-                    setPagination((p) => ({
-                      ...p,
-                      page: Math.min(p.totalPages, p.page + 1),
-                    }))
-                  }
-                  disabled={pagination.page >= pagination.totalPages}
-                  className="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
+              {/* Next page */}
+              <button
+                onClick={() =>
+                  setPagination((p) => ({
+                    ...p,
+                    page: Math.min(p.totalPages, p.page + 1),
+                  }))
+                }
+                disabled={pagination.page >= pagination.totalPages}
+                className="w-8 h-8 flex items-center justify-center text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              {/* Last page */}
+              <button
+                onClick={() =>
+                  setPagination((p) => ({
+                    ...p,
+                    page: p.totalPages,
+                  }))
+                }
+                disabled={pagination.page >= pagination.totalPages}
+                className="w-8 h-8 flex items-center justify-center text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                »
+              </button>
             </div>
           )}
         </div>
@@ -816,6 +832,13 @@ export function MentionsSection({
                 executedAt: selectedQuery.date,
                 error: selectedQuery.error,
                 brandMentions: selectedQuery.brandMentions,
+                citations: selectedQuery.citations
+                  .filter((c) => c.url)
+                  .map((c) => ({
+                    url: c.url!,
+                    title: c.title || c.brandName,
+                    snippet: c.snippet,
+                  })),
               }
             : null
         }

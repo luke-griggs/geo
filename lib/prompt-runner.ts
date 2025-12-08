@@ -13,6 +13,7 @@ import {
   isLLMError,
   extractBrandsWithGroq,
   isBrandExtractionError,
+  enrichCitationsWithDescriptions,
   type LLMProvider,
 } from "./llm";
 
@@ -157,6 +158,11 @@ export async function runPromptsForDomain(
         continue;
       }
 
+      // Enrich citations with meta descriptions (fetched from URLs)
+      const enrichedCitations = response.citations
+        ? await enrichCitationsWithDescriptions(response.citations)
+        : undefined;
+
       // Store the successful run
       await db.insert(promptRun).values({
         id: promptRunId,
@@ -165,6 +171,7 @@ export async function runPromptsForDomain(
         responseText: response.text,
         responseMetadata: response.metadata,
         searchQueries: response.searchQueries,
+        citations: enrichedCitations,
         durationMs: response.durationMs,
         executedAt: new Date(),
       });
@@ -265,6 +272,11 @@ export async function runSinglePrompt(
       };
     }
 
+    // Enrich citations with meta descriptions (fetched from URLs)
+    const enrichedCitations = response.citations
+      ? await enrichCitationsWithDescriptions(response.citations)
+      : undefined;
+
     // Store the successful run
     await db.insert(promptRun).values({
       id: promptRunId,
@@ -273,6 +285,7 @@ export async function runSinglePrompt(
       responseText: response.text,
       responseMetadata: response.metadata,
       searchQueries: response.searchQueries,
+      citations: enrichedCitations,
       durationMs: response.durationMs,
       executedAt: new Date(),
     });

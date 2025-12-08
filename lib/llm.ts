@@ -6,6 +6,12 @@ export type LLMProvider =
   | "grok"
   | "deepseek";
 
+export interface UrlCitation {
+  url: string;
+  title: string;
+  snippet?: string;
+}
+
 export interface LLMResponse {
   text: string;
   metadata: {
@@ -15,6 +21,90 @@ export interface LLMResponse {
   };
   durationMs: number;
   searchQueries?: string[]; // queries the model passed to the web search tool
+  citations?: UrlCitation[]; // url_citation annotations from web search
+}
+
+/**
+ * Fetch meta description from a URL
+ * Returns the og:description or meta description tag content
+ */
+async function fetchMetaDescription(url: string): Promise<string | undefined> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; GeoBot/1.0; +https://example.com)",
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) return undefined;
+
+    const html = await response.text();
+
+    // Try og:description first (usually more detailed)
+    const ogDescMatch = html.match(
+      /<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i
+    );
+    if (ogDescMatch?.[1]) {
+      return ogDescMatch[1].trim();
+    }
+
+    // Also try the reverse attribute order
+    const ogDescMatchAlt = html.match(
+      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i
+    );
+    if (ogDescMatchAlt?.[1]) {
+      return ogDescMatchAlt[1].trim();
+    }
+
+    // Fall back to regular meta description
+    const descMatch = html.match(
+      /<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i
+    );
+    if (descMatch?.[1]) {
+      return descMatch[1].trim();
+    }
+
+    // Also try reverse order for meta description
+    const descMatchAlt = html.match(
+      /<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i
+    );
+    if (descMatchAlt?.[1]) {
+      return descMatchAlt[1].trim();
+    }
+
+    return undefined;
+  } catch {
+    // Silently fail - description is optional
+    return undefined;
+  }
+}
+
+/**
+ * Enrich citations with meta descriptions from the URLs
+ */
+export async function enrichCitationsWithDescriptions(
+  citations: UrlCitation[]
+): Promise<UrlCitation[]> {
+  const enrichedCitations = await Promise.all(
+    citations.map(async (citation) => {
+      if (citation.snippet) return citation; // Already has a snippet
+
+      const description = await fetchMetaDescription(citation.url);
+      return {
+        ...citation,
+        snippet: description,
+      };
+    })
+  );
+
+  return enrichedCitations;
 }
 
 export interface LLMError {
@@ -66,6 +156,8 @@ export async function runOpenAI(
     // The output_text field is SDK-only, so we need to manually parse the output array
     let text = "";
     const searchQueries: string[] = [];
+    const citations: UrlCitation[] = [];
+    const seenUrls = new Set<string>(); // Deduplicate citations by URL
 
     if (data.output && Array.isArray(data.output)) {
       for (const item of data.output) {
@@ -74,7 +166,7 @@ export async function runOpenAI(
           searchQueries.push(item.action.query);
         }
 
-        // Extract text from message items
+        // Extract text and citations from message items
         if (
           item.type === "message" &&
           item.content &&
@@ -83,6 +175,27 @@ export async function runOpenAI(
           for (const contentItem of item.content) {
             if (contentItem.type === "output_text" && contentItem.text) {
               text += contentItem.text;
+
+              // Extract url_citation annotations
+              if (
+                contentItem.annotations &&
+                Array.isArray(contentItem.annotations)
+              ) {
+                for (const annotation of contentItem.annotations) {
+                  if (
+                    annotation.type === "url_citation" &&
+                    annotation.url &&
+                    !seenUrls.has(annotation.url)
+                  ) {
+                    seenUrls.add(annotation.url);
+                    citations.push({
+                      url: annotation.url,
+                      title: annotation.title || "",
+                      snippet: annotation.snippet || undefined,
+                    });
+                  }
+                }
+              }
             }
           }
         }
@@ -98,6 +211,7 @@ export async function runOpenAI(
       },
       durationMs,
       searchQueries: searchQueries.length > 0 ? searchQueries : undefined,
+      citations: citations.length > 0 ? citations : undefined,
     };
   } catch (error) {
     return {

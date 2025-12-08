@@ -1,7 +1,16 @@
 "use client";
 
-import { X, ChevronLeft, Download, Check, Calendar } from "lucide-react";
+import {
+  X,
+  ChevronLeft,
+  Download,
+  Check,
+  Calendar,
+  ChevronDown,
+  ExternalLink,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { useState } from "react";
 
 interface BrandMention {
   id: string;
@@ -11,6 +20,12 @@ interface BrandMention {
   mentioned: boolean;
 }
 
+interface Citation {
+  url: string;
+  title?: string;
+  snippet?: string;
+}
+
 interface PromptRun {
   id: string;
   llmProvider: string;
@@ -18,6 +33,7 @@ interface PromptRun {
   executedAt: string;
   error: string | null;
   brandMentions?: BrandMention[];
+  citations?: Citation[];
 }
 
 interface QueryDetailPanelProps {
@@ -34,14 +50,12 @@ function getPlatformIcon(provider: string) {
     case "chatgpt":
     case "openai":
       return (
-        <div className="w-5 h-5 rounded bg-[#10a37f] flex items-center justify-center">
-          <svg
-            viewBox="0 0 24 24"
-            className="w-3 h-3 text-white"
-            fill="currentColor"
-          >
-            <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729z" />
-          </svg>
+        <div className="w-5 h-5 rounded flex items-center justify-center overflow-hidden">
+          <img
+            src="https://www.google.com/s2/favicons?domain=https://chatgpt.com&sz=32"
+            alt="ChatGPT"
+            className="w-5 h-5"
+          />
         </div>
       );
     case "perplexity":
@@ -112,6 +126,18 @@ function getPlatformName(provider: string) {
   }
 }
 
+// Helper to extract domain from URL
+function getDomainFromUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace(/^www\./, "");
+  } catch {
+    // If URL parsing fails, try to extract domain manually
+    const match = url.match(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/i);
+    return match ? match[1] : url;
+  }
+}
+
 export function QueryDetailPanel({
   isOpen,
   onClose,
@@ -120,6 +146,8 @@ export function QueryDetailPanel({
   isMentioned,
   domainName,
 }: QueryDetailPanelProps) {
+  const [citationsExpanded, setCitationsExpanded] = useState(true);
+
   if (!isOpen) return null;
 
   const mentionedBrands =
@@ -132,6 +160,8 @@ export function QueryDetailPanel({
       })
     : null;
 
+  const citations = latestRun?.citations || [];
+
   return (
     <>
       {/* Backdrop */}
@@ -141,7 +171,7 @@ export function QueryDetailPanel({
       />
 
       {/* Panel */}
-      <div className="fixed inset-y-0 right-0 w-full max-w-[600px] bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="fixed inset-y-0 right-0 w-full max-w-[800px] bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <button
@@ -338,6 +368,63 @@ export function QueryDetailPanel({
                 </p>
               )}
             </div>
+
+            {/* Citations Section */}
+            {citations.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setCitationsExpanded(!citationsExpanded)}
+                  className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors mb-4"
+                >
+                  Citations
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      citationsExpanded ? "rotate-0" : "-rotate-90"
+                    }`}
+                  />
+                </button>
+
+                {citationsExpanded && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {citations.map((citation, index) => {
+                      const domain = getDomainFromUrl(citation.url);
+                      return (
+                        <a
+                          key={index}
+                          href={citation.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group block p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-all hover:shadow-sm"
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <img
+                              src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                              alt=""
+                              className="w-4 h-4 rounded-sm flex-shrink-0"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                            <span className="text-xs text-gray-500 truncate">
+                              {domain}
+                            </span>
+                            <ExternalLink className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity ml-auto flex-shrink-0" />
+                          </div>
+                          <h4 className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">
+                            {citation.title || domain}
+                          </h4>
+                          {citation.snippet && (
+                            <p className="text-xs text-gray-500 line-clamp-2">
+                              {citation.snippet}
+                            </p>
+                          )}
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

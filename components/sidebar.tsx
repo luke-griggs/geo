@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSession, signOut } from "@/lib/auth-client";
+import { AccountSettingsModal } from "@/components/account-settings-modal";
 
 type NavSection = "prompts" | "visibility" | "mentions" | "sources";
 
@@ -57,6 +58,7 @@ interface SidebarProps {
 export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { data: session } = useSession();
 
   const user = session?.user ?? {
@@ -161,7 +163,10 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
                   <p className="text-xs text-gray-500 truncate">{user.email}</p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer flex items-center gap-2">
+                <DropdownMenuItem
+                  onClick={() => setSettingsOpen(true)}
+                  className="cursor-pointer flex items-center gap-2"
+                >
                   <User className="h-4 w-4" />
                   Profile
                 </DropdownMenuItem>
@@ -270,7 +275,10 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
                   <p className="text-xs text-gray-500 truncate">{user.email}</p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer flex items-center gap-2">
+                <DropdownMenuItem
+                  onClick={() => setSettingsOpen(true)}
+                  className="cursor-pointer flex items-center gap-2"
+                >
                   <User className="h-4 w-4" />
                   Profile
                 </DropdownMenuItem>
@@ -287,6 +295,12 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
           </div>
         </div>
       </aside>
+
+      {/* Account Settings Modal */}
+      <AccountSettingsModal
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+      />
     </TooltipProvider>
   );
 }

@@ -83,7 +83,15 @@ function formatTime(date: Date) {
 }
 
 function getModelIcon(model: string) {
-  // Simple icon mapping or consistent coloring
+  if (model.toLowerCase() === "chatgpt" || model.toLowerCase() === "openai") {
+    return (
+      <img
+        src="https://www.google.com/s2/favicons?domain=https://chatgpt.com&sz=32"
+        alt="ChatGPT"
+        className="h-5 w-5"
+      />
+    );
+  }
   return <Bot className="h-5 w-5 text-gray-600" />;
 }
 
@@ -104,10 +112,10 @@ export function PromptDetailView({
   const [savingModels, setSavingModels] = useState(false);
 
   const availableProviders = [
-    { id: "chatgpt", name: "ChatGPT", icon: Bot },
-    { id: "perplexity", name: "Perplexity", icon: Search },
-    { id: "claude", name: "Claude", icon: Bot },
-    { id: "gemini", name: "Gemini", icon: Bot },
+    { id: "chatgpt", name: "ChatGPT", icon: null, useImage: true },
+    { id: "perplexity", name: "Perplexity", icon: Search, useImage: false },
+    { id: "claude", name: "Claude", icon: Bot, useImage: false },
+    { id: "gemini", name: "Gemini", icon: Bot, useImage: false },
   ];
 
   const handleSectionChange = (section: NavSection) => {
@@ -414,13 +422,21 @@ export function PromptDetailView({
                               isSelected ? "bg-white shadow-sm" : "bg-gray-100"
                             }`}
                           >
-                            <provider.icon
-                              className={`h-6 w-6 ${
-                                isSelected
-                                  ? "text-emerald-600"
-                                  : "text-gray-500"
-                              }`}
-                            />
+                            {provider.useImage ? (
+                              <img
+                                src="https://www.google.com/s2/favicons?domain=https://chatgpt.com&sz=64"
+                                alt={provider.name}
+                                className="h-6 w-6"
+                              />
+                            ) : provider.icon ? (
+                              <provider.icon
+                                className={`h-6 w-6 ${
+                                  isSelected
+                                    ? "text-emerald-600"
+                                    : "text-gray-500"
+                                }`}
+                              />
+                            ) : null}
                           </div>
                           <span
                             className={`font-medium ${

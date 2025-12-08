@@ -135,6 +135,41 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const total = runs.length;
     const totalPages = Math.ceil(total / limit);
 
+    // Calculate aggregate stats from ALL runs (before pagination)
+    const aggregateStats = {
+      totalMentions: runs.filter((r) => mentionByRunId.get(r.id)?.mentioned)
+        .length,
+      totalQueries: runs.length,
+      // Group by date for chart
+      chartData: Object.entries(
+        runs.reduce((acc, r) => {
+          const date = r.executedAt.toISOString().split("T")[0];
+          if (!acc[date]) acc[date] = 0;
+          if (mentionByRunId.get(r.id)?.mentioned) acc[date]++;
+          return acc;
+        }, {} as Record<string, number>)
+      )
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+      // Platform breakdown
+      platformData: Object.entries(
+        runs.reduce((acc, r) => {
+          if (!acc[r.llmProvider])
+            acc[r.llmProvider] = { total: 0, mentions: 0 };
+          acc[r.llmProvider].total++;
+          if (mentionByRunId.get(r.id)?.mentioned) {
+            acc[r.llmProvider].mentions++;
+          }
+          return acc;
+        }, {} as Record<string, { total: number; mentions: number }>)
+      ).map(([name, data]) => ({
+        name,
+        mentions: data.mentions,
+        percentage:
+          data.total > 0 ? Math.round((data.mentions / data.total) * 100) : 0,
+      })),
+    };
+
     // Apply pagination
     const offset = (page - 1) * limit;
     const paginatedRuns = runs.slice(offset, offset + limit);
@@ -164,14 +199,45 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         ? parseFloat(domainMention.sentimentScore)
         : null;
 
-      // Get citations from brand mentions
-      const citations = run.brandMentions
+      // Get citations - prefer url_citations from the LLM response, fallback to brand mentions
+      const urlCitations =
+        (
+          run.citations as
+            | Array<{ url: string; title: string; snippet?: string }>
+            | null
+            | undefined
+        )?.map((c) => {
+          // Extract domain from URL
+          let domain: string | null = null;
+          try {
+            if (c.url) {
+              const url = new URL(c.url);
+              domain = url.hostname;
+            }
+          } catch {
+            // Invalid URL, domain stays null
+          }
+          return {
+            brandName: c.title || "",
+            url: c.url,
+            domain,
+            title: c.title,
+            snippet: c.snippet,
+          };
+        }) || [];
+
+      // Fallback to brand mention citations if no url_citations
+      const brandCitations = run.brandMentions
         .filter((b) => b.citationUrl)
         .map((b) => ({
           brandName: b.brandName,
           url: b.citationUrl,
           domain: b.brandDomain,
+          title: undefined,
+          snippet: undefined,
         }));
+
+      const citations = urlCitations.length > 0 ? urlCitations : brandCitations;
 
       return {
         id: run.id,
@@ -214,6 +280,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         total,
         totalPages,
       },
+      stats: aggregateStats,
       domainName: domainRecord.name || domainRecord.domain,
     });
   } catch (error) {

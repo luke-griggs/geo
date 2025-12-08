@@ -190,6 +190,10 @@ export const promptRun = pgTable(
     responseText: text("response_text"),
     responseMetadata: jsonb("response_metadata"), // tokens used, model version, etc.
     searchQueries: jsonb("search_queries").$type<string[]>(), // queries the model passed to the web search tool
+    citations:
+      jsonb("citations").$type<
+        Array<{ url: string; title: string; snippet?: string }>
+      >(), // url_citation annotations from web search
     executedAt: timestamp("executed_at").defaultNow().notNull(),
     durationMs: integer("duration_ms"),
     error: text("error"), // Store error if request failed

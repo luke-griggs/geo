@@ -13,6 +13,12 @@ interface BrandMention {
   mentioned: boolean;
 }
 
+interface Citation {
+  url: string;
+  title?: string;
+  snippet?: string;
+}
+
 interface PromptRun {
   id: string;
   llmProvider: string;
@@ -24,6 +30,7 @@ interface PromptRun {
     position: number | null;
   }>;
   brandMentions?: BrandMention[];
+  citations?: Citation[];
 }
 
 interface Prompt {
@@ -639,6 +646,7 @@ export function PromptsSection({
                 executedAt: selectedPrompt.runs[0].executedAt,
                 error: selectedPrompt.runs[0].error,
                 brandMentions: selectedPrompt.runs[0].brandMentions,
+                citations: selectedPrompt.runs[0].citations,
               }
             : null
         }
