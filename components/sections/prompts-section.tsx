@@ -3,6 +3,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search, ChevronDown, X, Loader2, Play } from "lucide-react";
+import { QueryDetailPanel } from "@/components/query-detail-panel";
+
+interface BrandMention {
+  id: string;
+  brandName: string;
+  brandDomain: string | null;
+  position: number | null;
+  mentioned: boolean;
+}
 
 interface PromptRun {
   id: string;
@@ -14,6 +23,7 @@ interface PromptRun {
     mentioned: boolean;
     position: number | null;
   }>;
+  brandMentions?: BrandMention[];
 }
 
 interface Prompt {
@@ -36,7 +46,7 @@ function ScoreCircle({ score }: { score: number }) {
   const hasScore = score > 0;
   return (
     <div
-      className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+      className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
         hasScore
           ? "bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-700 ring-2 ring-emerald-400/50"
           : "bg-gray-100 text-gray-400"
@@ -62,6 +72,67 @@ function RunningDot() {
       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
       <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
     </span>
+  );
+}
+
+function TopBrands({ brands }: { brands: BrandMention[] }) {
+  // Sort by position (lower is better), filter only mentioned brands
+  const sortedBrands = brands
+    .filter((b) => b.mentioned)
+    .sort((a, b) => (a.position || 999) - (b.position || 999))
+    .slice(0, 3);
+
+  const remainingCount = Math.max(
+    0,
+    brands.filter((b) => b.mentioned).length - 3
+  );
+
+  if (sortedBrands.length === 0) {
+    return <span className="text-xs text-gray-300">—</span>;
+  }
+
+  return (
+    <div className="flex items-center -space-x-1.5">
+      {sortedBrands.map((brand, index) => {
+        const domain =
+          brand.brandDomain ||
+          `${brand.brandName.toLowerCase().replace(/\s+/g, "")}.com`;
+        return (
+          <div
+            key={brand.id}
+            className="w-6 h-6 rounded-full bg-white border-2 border-white shadow-sm overflow-hidden flex items-center justify-center"
+            style={{ zIndex: 3 - index }}
+            title={brand.brandName}
+          >
+            <img
+              src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+              alt={brand.brandName}
+              className="w-4 h-4 object-contain"
+              onError={(e) => {
+                // Fallback to first letter if favicon fails
+                e.currentTarget.style.display = "none";
+                e.currentTarget.parentElement!.classList.add(
+                  "bg-gray-100",
+                  "text-xs",
+                  "font-medium",
+                  "text-gray-500"
+                );
+                e.currentTarget.parentElement!.textContent =
+                  brand.brandName[0].toUpperCase();
+              }}
+            />
+          </div>
+        );
+      })}
+      {remainingCount > 0 && (
+        <div
+          className="w-6 h-6 rounded-full bg-gray-100 border-2 border-white shadow-sm flex items-center justify-center text-[10px] font-medium text-gray-500"
+          style={{ zIndex: 0 }}
+        >
+          +{remainingCount}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -188,6 +259,8 @@ export function PromptsSection({
     new Set()
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   // Fetch prompts
   const fetchPrompts = useCallback(async () => {
@@ -341,9 +414,9 @@ export function PromptsSection({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full pt-4">
       {/* Header bar */}
-      <div className="flex items-center justify-between gap-4 pb-6">
+      <div className="flex items-center justify-between gap-4 pb-4">
         {/* Left side - Search and filter */}
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -353,10 +426,10 @@ export function PromptsSection({
               placeholder="Search prompts..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-64 pl-9 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-300 focus:bg-white transition-all placeholder:text-gray-400"
+              className="w-56 pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-300 focus:bg-white transition-all placeholder:text-gray-400"
             />
           </div>
-          <button className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+          <button className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
             Active
             <ChevronDown className="h-4 w-4 text-gray-400" />
           </button>
@@ -364,28 +437,28 @@ export function PromptsSection({
 
         {/* Right side - Actions */}
         <div className="flex items-center gap-3">
-          <button className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
+          <button className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
             <Plus className="h-4 w-4" />
             New Article
           </button>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
           >
             <Plus className="h-4 w-4" />
-            Create prompt
+            Create prompts
           </button>
         </div>
       </div>
 
       {/* Domain indicator */}
-      <div className="flex items-center gap-2 pb-4 text-sm text-gray-500">
+      <div className="flex items-center gap-2 pb-3 text-sm text-gray-500">
         <span>Tracking:</span>
         <span className="font-medium text-gray-900">{domainName}</span>
       </div>
 
       {/* Table header info */}
-      <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+      <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
         <input
           type="checkbox"
           className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900/10"
@@ -419,9 +492,12 @@ export function PromptsSection({
         {/* Right side headers */}
         <div className="ml-auto flex items-center">
           <div className="w-28 text-xs font-medium text-gray-500 text-center">
+            Top Brands
+          </div>
+          <div className="w-24 text-xs font-medium text-gray-500 text-center">
             Last Run
           </div>
-          <div className="w-20 text-xs font-medium text-gray-500 text-center">
+          <div className="w-16 text-xs font-medium text-gray-500 text-center">
             Actions
           </div>
         </div>
@@ -455,17 +531,17 @@ export function PromptsSection({
             const score = getPromptScore(prompt);
             const status = getPromptStatus(prompt);
             const lastRun = prompt.runs[0];
+            const brandMentions = lastRun?.brandMentions || [];
 
             const handleRowClick = () => {
-              router.push(
-                `/workspaces/${workspaceId}/domains/${domainId}/prompts/${prompt.id}`
-              );
+              setSelectedPrompt(prompt);
+              setIsPanelOpen(true);
             };
 
             return (
               <div
                 key={prompt.id}
-                className="flex items-center gap-3 py-4 border-b border-gray-50 hover:bg-gray-50/50 transition-colors group"
+                className="flex items-center gap-3 py-2.5 border-b border-gray-50 hover:bg-gray-50/50 transition-colors group"
               >
                 {/* Clickable area for navigation */}
                 <div
@@ -482,14 +558,19 @@ export function PromptsSection({
 
                   {/* Prompt text */}
                   <div className="flex-1 flex items-center gap-2 min-w-0">
-                    <span className="text-sm text-gray-900 truncate">
+                    <span className="text-sm text-gray-900 truncate hover:underline">
                       {prompt.promptText}
                     </span>
                     {isRunning ? <RunningDot /> : <StatusDot status={status} />}
                   </div>
 
-                  {/* Last Run */}
+                  {/* Top Brands */}
                   <div className="w-28 flex items-center justify-center">
+                    <TopBrands brands={brandMentions} />
+                  </div>
+
+                  {/* Last Run */}
+                  <div className="w-24 flex items-center justify-center">
                     {lastRun ? (
                       <span className="text-xs text-gray-500">
                         {new Date(lastRun.executedAt).toLocaleDateString()}
@@ -501,14 +582,14 @@ export function PromptsSection({
                 </div>
 
                 {/* Actions - separate from clickable area */}
-                <div className="w-20 flex items-center justify-center">
+                <div className="w-16 flex items-center justify-center">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRunPrompt(prompt.id);
                     }}
                     disabled={isRunning}
-                    className="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Run prompt"
                   >
                     {isRunning ? (
@@ -530,6 +611,33 @@ export function PromptsSection({
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreatePrompt}
         isSubmitting={isSubmitting}
+      />
+
+      {/* Query Detail Panel */}
+      <QueryDetailPanel
+        isOpen={isPanelOpen}
+        onClose={() => {
+          setIsPanelOpen(false);
+          setSelectedPrompt(null);
+        }}
+        promptText={selectedPrompt?.promptText || ""}
+        latestRun={
+          selectedPrompt?.runs[0]
+            ? {
+                id: selectedPrompt.runs[0].id,
+                llmProvider: selectedPrompt.runs[0].llmProvider,
+                responseText: selectedPrompt.runs[0].responseText,
+                executedAt: selectedPrompt.runs[0].executedAt,
+                error: selectedPrompt.runs[0].error,
+                brandMentions: selectedPrompt.runs[0].brandMentions,
+              }
+            : null
+        }
+        isMentioned={
+          selectedPrompt?.runs[0]?.mentionAnalyses?.some((m) => m.mentioned) ||
+          false
+        }
+        domainName={domainName}
       />
     </div>
   );

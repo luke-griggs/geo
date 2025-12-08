@@ -141,7 +141,13 @@ function DashboardContent() {
               domainName={domain.domain}
             />
           )}
-          {activeSection === "mentions" && <MentionsSection />}
+          {activeSection === "mentions" && (
+            <MentionsSection
+              workspaceId={workspace.id}
+              domainId={domain.id}
+              domainName={domain.domain}
+            />
+          )}
           {activeSection === "analytics" && <AnalyticsSection />}
           {activeSection === "sources" && <SourcesSection />}
         </div>

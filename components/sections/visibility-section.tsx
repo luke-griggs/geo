@@ -10,6 +10,7 @@ import {
 } from "@/components/visibility/filter-bar";
 import { VisibilityChart } from "@/components/visibility/visibility-chart";
 import { IndustryRanking } from "@/components/visibility/industry-ranking";
+import { SourceDomainsSection } from "@/components/visibility/source-domains";
 
 interface VisibilitySectionProps {
   workspaceId: string;
@@ -248,6 +249,14 @@ export function VisibilitySection({
         </div>
       )}
 
+      {/* Source Domains */}
+      <SourceDomainsSection
+        workspaceId={workspaceId}
+        domainId={domainId}
+        timePeriod={timePeriod}
+        platforms={platforms}
+      />
+
       {/* Loading overlay for filter changes */}
       {isLoading && visibilityData && (
         <div className="fixed inset-0 bg-white/50 flex items-center justify-center z-50 pointer-events-none">
@@ -257,5 +266,3 @@ export function VisibilitySection({
     </div>
   );
 }
-
-

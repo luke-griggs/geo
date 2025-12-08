@@ -53,7 +53,7 @@ export function IndustryRanking({
       ) : (
         <div className="overflow-hidden">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-white">
               <tr className="border-b border-gray-100">
                 <th className="text-left py-2 px-1 text-xs font-medium text-gray-500 w-8">
                   #
@@ -87,65 +87,69 @@ export function IndustryRanking({
                 </th>
               </tr>
             </thead>
-            <tbody>
-              {data.map((item) => (
-                <tr
-                  key={item.rank}
-                  className={cn(
-                    "border-b border-gray-50 hover:bg-gray-50 transition-colors",
-                    item.isUserDomain && "bg-orange-50/50"
-                  )}
-                >
-                  <td className="py-3 px-1 text-gray-400">{item.rank}</td>
-                  <td className="py-3 px-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-md bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
-                        {item.brand.charAt(0).toUpperCase()}
+          </table>
+          <div className="max-h-[280px] overflow-y-auto">
+            <table className="w-full text-sm">
+              <tbody>
+                {data.map((item) => (
+                  <tr
+                    key={item.rank}
+                    className={cn(
+                      "border-b border-gray-50 hover:bg-gray-50 transition-colors",
+                      item.isUserDomain && "bg-orange-50/50"
+                    )}
+                  >
+                    <td className="py-3 px-1 text-gray-400 w-8">{item.rank}</td>
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
+                          {item.brand.charAt(0).toUpperCase()}
+                        </div>
+                        <span
+                          className={cn(
+                            "font-medium",
+                            item.isUserDomain
+                              ? "text-[#c9644a]"
+                              : "text-gray-900"
+                          )}
+                        >
+                          {item.brand}
+                        </span>
+                        {item.isUserDomain && (
+                          <span className="text-[10px] bg-[#c9644a]/10 text-[#c9644a] px-1.5 py-0.5 rounded font-medium">
+                            YOU
+                          </span>
+                        )}
                       </div>
+                    </td>
+                    <td className="py-3 px-2 text-right text-gray-600">
+                      {item.mentions}
+                    </td>
+                    <td className="py-3 px-2 text-right text-gray-600">
+                      {item.position !== null ? item.position.toFixed(1) : "-"}
+                    </td>
+                    <td className="py-3 px-2 text-right">
                       <span
                         className={cn(
-                          "font-medium",
-                          item.isUserDomain ? "text-[#c9644a]" : "text-gray-900"
+                          item.change > 0 && "text-green-600",
+                          item.change < 0 && "text-red-600",
+                          item.change === 0 && "text-gray-400"
                         )}
                       >
-                        {item.brand}
+                        {item.change > 0 && "+"}
+                        {item.change.toFixed(1)}%
                       </span>
-                      {item.isUserDomain && (
-                        <span className="text-[10px] bg-[#c9644a]/10 text-[#c9644a] px-1.5 py-0.5 rounded font-medium">
-                          YOU
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-2 text-right text-gray-600">
-                    {item.mentions}
-                  </td>
-                  <td className="py-3 px-2 text-right text-gray-600">
-                    {item.position !== null ? item.position.toFixed(1) : "-"}
-                  </td>
-                  <td className="py-3 px-2 text-right">
-                    <span
-                      className={cn(
-                        item.change > 0 && "text-green-600",
-                        item.change < 0 && "text-red-600",
-                        item.change === 0 && "text-gray-400"
-                      )}
-                    >
-                      {item.change > 0 && "+"}
-                      {item.change.toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="py-3 px-2 text-right font-medium text-gray-900">
-                    {item.visibility.toFixed(1)}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="py-3 px-2 text-right font-medium text-gray-900">
+                      {item.visibility.toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
   );
 }
-
-

@@ -75,6 +75,7 @@ export async function GET(
           limit: 1, // Just get the latest run for each prompt
           with: {
             mentionAnalyses: true, // Include mention analyses for scoring
+            brandMentions: true, // Include brand mentions for top brands display
           },
         },
       },
