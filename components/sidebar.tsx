@@ -6,7 +6,6 @@ import {
   PanelLeft,
   PanelRight,
   FileText,
-  BarChart3,
   Database,
   User,
   LogOut,
@@ -31,18 +30,12 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSession, signOut } from "@/lib/auth-client";
 
-type NavSection =
-  | "prompts"
-  | "visibility"
-  | "mentions"
-  | "analytics"
-  | "sources";
+type NavSection = "prompts" | "visibility" | "mentions" | "sources";
 
 const navItems = [
-  { id: "prompts" as const, label: "Prompts", icon: FileText },
   { id: "visibility" as const, label: "Visibility", icon: Eye },
+  { id: "prompts" as const, label: "Prompts", icon: FileText },
   { id: "mentions" as const, label: "Mentions", icon: AtSign },
-  { id: "analytics" as const, label: "Analytics", icon: BarChart3 },
   { id: "sources" as const, label: "Sources", icon: Database },
 ];
 

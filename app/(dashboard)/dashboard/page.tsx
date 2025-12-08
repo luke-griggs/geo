@@ -6,7 +6,6 @@ import { Sidebar, type NavSection } from "@/components/sidebar";
 import { PromptsSection } from "@/components/sections/prompts-section";
 import { VisibilitySection } from "@/components/sections/visibility-section";
 import { MentionsSection } from "@/components/sections/mentions-section";
-import { AnalyticsSection } from "@/components/sections/analytics-section";
 import { SourcesSection } from "@/components/sections/sources-section";
 import { Loader2 } from "lucide-react";
 
@@ -32,9 +31,7 @@ function DashboardContent() {
 
   const activeSection: NavSection =
     sectionParam &&
-    ["prompts", "visibility", "mentions", "analytics", "sources"].includes(
-      sectionParam
-    )
+    ["prompts", "visibility", "mentions", "sources"].includes(sectionParam)
       ? (sectionParam as NavSection)
       : "prompts";
 
@@ -148,7 +145,6 @@ function DashboardContent() {
               domainName={domain.domain}
             />
           )}
-          {activeSection === "analytics" && <AnalyticsSection />}
           {activeSection === "sources" && <SourcesSection />}
         </div>
       </main>

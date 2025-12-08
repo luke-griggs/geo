@@ -6,7 +6,6 @@ import {
   Calendar,
   Cpu,
   MapPin,
-  MessageCircle,
   Users,
   Search,
   Check,
@@ -183,23 +182,6 @@ export function FilterBar({
               {option.label}
             </button>
           ))}
-        </div>
-      </Dropdown>
-
-      {/* Topics Dropdown (placeholder) */}
-      <Dropdown
-        trigger={
-          <button className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <MessageCircle className="w-4 h-4 text-gray-500" />
-            <span>All Topics</span>
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          </button>
-        }
-        isOpen={openDropdown === "topics"}
-        onOpenChange={(open) => setOpenDropdown(open ? "topics" : null)}
-      >
-        <div className="p-3 text-sm text-gray-500">
-          Topic filtering coming soon
         </div>
       </Dropdown>
 
@@ -392,5 +374,3 @@ function Dropdown({
     </div>
   );
 }
-
-

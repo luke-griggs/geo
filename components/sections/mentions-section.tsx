@@ -426,9 +426,9 @@ export function MentionsSection({
   }
 
   return (
-    <div className="flex flex-col h-full space-y-6">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div>
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Mentions</h1>
         <p className="text-sm text-gray-500 mt-1">
           Track all queries and responses mentioning{" "}
@@ -436,359 +436,367 @@ export function MentionsSection({
         </p>
       </div>
 
-      {/* Filter bar */}
-      <div className="flex items-center gap-3">
-        <div className="relative">
-          <button
-            onClick={() => {
-              const next =
-                timePeriod === "7d"
-                  ? "30d"
-                  : timePeriod === "30d"
-                  ? "90d"
-                  : "7d";
-              setTimePeriod(next);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Calendar className="h-4 w-4 text-gray-500" />
-            {timePeriodLabel}
-            <ChevronDown className="h-4 w-4 text-gray-400" />
-          </button>
-        </div>
-        <FilterButton icon={Sparkles}>All Platforms</FilterButton>
-        <FilterButton icon={Tag}>All Topics</FilterButton>
-        <FilterButton icon={MapPin}>Locations</FilterButton>
-      </div>
-
-      {/* Stats cards row */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Mentions & Citations card */}
-        <div className="p-5 bg-white border border-gray-200 rounded-xl">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-sm font-semibold text-gray-900">
-              Mentions & Citations
-            </h3>
-            <Info className="w-3.5 h-3.5 text-gray-400" />
-          </div>
-          <p className="text-xs text-gray-500 mb-4">
-            Daily brand mentions and branded citations across AI answers
-          </p>
-
-          <div className="flex items-baseline gap-2 mb-4">
-            <span className="text-3xl font-bold text-gray-900">
-              {stats.totalMentions}
-            </span>
-            <span
-              className={`text-sm font-medium ${
-                stats.change >= 0 ? "text-emerald-500" : "text-red-500"
-              }`}
+      <div className="space-y-6">
+        {/* Filter bar */}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <button
+              onClick={() => {
+                const next =
+                  timePeriod === "7d"
+                    ? "30d"
+                    : timePeriod === "30d"
+                    ? "90d"
+                    : "7d";
+                setTimePeriod(next);
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              {stats.change >= 0 ? "+" : ""}
-              {stats.change} vs previous period
-            </span>
+              <Calendar className="h-4 w-4 text-gray-500" />
+              {timePeriodLabel}
+              <ChevronDown className="h-4 w-4 text-gray-400" />
+            </button>
           </div>
-
-          <MiniAreaChart data={stats.chartData} />
+          <FilterButton icon={Sparkles}>All Platforms</FilterButton>
+          <FilterButton icon={Tag}>All Topics</FilterButton>
+          <FilterButton icon={MapPin}>Locations</FilterButton>
         </div>
 
-        {/* Performance by Platform card */}
-        <div className="p-5 bg-white border border-gray-200 rounded-xl">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-sm font-semibold text-gray-900">
-              Performance by Platform
-            </h3>
-            <Info className="w-3.5 h-3.5 text-gray-400" />
-          </div>
-          <p className="text-xs text-gray-500 mb-4">
-            Mentions and branded citations per AI engine
-          </p>
+        {/* Stats cards row */}
+        <div className="grid grid-cols-2 gap-6">
+          {/* Mentions & Citations card */}
+          <div className="p-5 bg-white border border-gray-200 rounded-xl">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Mentions & Citations
+              </h3>
+              <Info className="w-3.5 h-3.5 text-gray-400" />
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              Daily brand mentions and branded citations across AI answers
+            </p>
 
-          <div className="flex items-baseline gap-2 mb-6">
-            <span className="text-3xl font-bold text-gray-900">
-              {stats.totalQueries > 0
-                ? ((stats.totalMentions / stats.totalQueries) * 100).toFixed(1)
-                : "0"}
-              %
-            </span>
-            <span className="text-sm text-gray-500">overall mention rate</span>
-          </div>
-
-          {/* Platform list */}
-          <div className="space-y-3">
-            {stats.platformData.length === 0 ? (
-              <p className="text-sm text-gray-400">No platform data yet</p>
-            ) : (
-              stats.platformData.map((platform) => (
-                <div key={platform.name} className="flex items-center gap-4">
-                  <SourceIcon source={platform.name} />
-                  <span className="text-sm font-medium text-gray-900 w-20 capitalize">
-                    {platform.name}
-                  </span>
-                  <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-orange-500 rounded-full"
-                      style={{ width: `${platform.percentage}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-semibold text-gray-900 w-8 text-right">
-                    {platform.mentions}
-                  </span>
-                  <span className="text-sm text-gray-500 w-14 text-right">
-                    {platform.percentage}%
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* All Queries section */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex items-center gap-2 mb-1">
-          <h3 className="text-base font-semibold text-gray-900">All Queries</h3>
-          <Info className="w-3.5 h-3.5 text-gray-400" />
-        </div>
-        <p className="text-sm text-gray-500 mb-4">
-          All queries and responses from AI platforms
-        </p>
-
-        {/* Controls */}
-        <div className="flex items-center justify-between mb-4">
-          {/* Toggle */}
-          <label className="flex items-center gap-2 cursor-pointer">
-            <div
-              className={`relative w-9 h-5 rounded-full transition-colors ${
-                showMentionsOnly ? "bg-gray-900" : "bg-gray-200"
-              }`}
-              onClick={() => setShowMentionsOnly(!showMentionsOnly)}
-            >
-              <div
-                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${
-                  showMentionsOnly ? "translate-x-4" : ""
+            <div className="flex items-baseline gap-2 mb-4">
+              <span className="text-3xl font-bold text-gray-900">
+                {stats.totalMentions}
+              </span>
+              <span
+                className={`text-sm font-medium ${
+                  stats.change >= 0 ? "text-emerald-500" : "text-red-500"
                 }`}
-              />
+              >
+                {stats.change >= 0 ? "+" : ""}
+                {stats.change} vs previous period
+              </span>
             </div>
-            <span className="text-sm text-gray-600">Show mentions only</span>
-          </label>
 
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">
-              {filteredQueries.length} queries
-            </span>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search queries..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-56 pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-300 focus:bg-white transition-all placeholder:text-gray-400"
-              />
+            <MiniAreaChart data={stats.chartData} />
+          </div>
+
+          {/* Performance by Platform card */}
+          <div className="p-5 bg-white border border-gray-200 rounded-xl">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Performance by Platform
+              </h3>
+              <Info className="w-3.5 h-3.5 text-gray-400" />
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              Mentions and branded citations per AI engine
+            </p>
+
+            <div className="flex items-baseline gap-2 mb-6">
+              <span className="text-3xl font-bold text-gray-900">
+                {stats.totalQueries > 0
+                  ? ((stats.totalMentions / stats.totalQueries) * 100).toFixed(
+                      1
+                    )
+                  : "0"}
+                %
+              </span>
+              <span className="text-sm text-gray-500">
+                overall mention rate
+              </span>
+            </div>
+
+            {/* Platform list */}
+            <div className="space-y-3">
+              {stats.platformData.length === 0 ? (
+                <p className="text-sm text-gray-400">No platform data yet</p>
+              ) : (
+                stats.platformData.map((platform) => (
+                  <div key={platform.name} className="flex items-center gap-4">
+                    <SourceIcon source={platform.name} />
+                    <span className="text-sm font-medium text-gray-900 w-20 capitalize">
+                      {platform.name}
+                    </span>
+                    <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-orange-500 rounded-full"
+                        style={{ width: `${platform.percentage}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900 w-8 text-right">
+                      {platform.mentions}
+                    </span>
+                    <span className="text-sm text-gray-500 w-14 text-right">
+                      {platform.percentage}%
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="flex-1 overflow-auto border border-gray-200 rounded-xl">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                <p className="text-sm text-gray-500">Loading queries...</p>
+        {/* All Queries section */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-base font-semibold text-gray-900">
+              All Queries
+            </h3>
+            <Info className="w-3.5 h-3.5 text-gray-400" />
+          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            All queries and responses from AI platforms
+          </p>
+
+          {/* Controls */}
+          <div className="flex items-center justify-between mb-4">
+            {/* Toggle */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <div
+                className={`relative w-9 h-5 rounded-full transition-colors ${
+                  showMentionsOnly ? "bg-gray-900" : "bg-gray-200"
+                }`}
+                onClick={() => setShowMentionsOnly(!showMentionsOnly)}
+              >
+                <div
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${
+                    showMentionsOnly ? "translate-x-4" : ""
+                  }`}
+                />
+              </div>
+              <span className="text-sm text-gray-600">Show mentions only</span>
+            </label>
+
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-500">
+                {filteredQueries.length} queries
+              </span>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search queries..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-56 pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-300 focus:bg-white transition-all placeholder:text-gray-400"
+                />
               </div>
             </div>
-          ) : (
-            <table className="w-full">
-              <thead className="bg-gray-50 sticky top-0">
-                <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <th className="px-4 py-3 w-20">Date</th>
-                  <th className="px-4 py-3">Query</th>
-                  <th className="px-4 py-3 w-24 text-center">Sources</th>
-                  <th className="px-4 py-3 w-36">Locations</th>
-                  <th className="px-4 py-3 w-24 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      Mentioned
-                      <ChevronDown className="w-3 h-3" />
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 w-24 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      Avg Position
-                      <ChevronDown className="w-3 h-3" />
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 w-28 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      Sentiment
-                      <ChevronDown className="w-3 h-3" />
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 w-28 text-center">Citations</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
-                {filteredQueries.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-4 py-12 text-center text-gray-500"
-                    >
-                      {queries.length === 0
-                        ? "No queries found. Run some prompts to see data here."
-                        : "No queries match your search."}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredQueries.map((query) => {
-                    const dateObj = new Date(query.date);
-                    const dateStr = dateObj.toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    });
+          </div>
 
-                    return (
-                      <tr
-                        key={query.id}
-                        className="hover:bg-gray-50/50 transition-colors cursor-pointer"
-                        onClick={() => {
-                          setSelectedQuery(query);
-                          setIsPanelOpen(true);
-                        }}
+          {/* Table */}
+          <div className="flex-1 overflow-auto border border-gray-200 rounded-xl">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  <p className="text-sm text-gray-500">Loading queries...</p>
+                </div>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 w-20">Date</th>
+                    <th className="px-4 py-3">Query</th>
+                    <th className="px-4 py-3 w-24 text-center">Sources</th>
+                    <th className="px-4 py-3 w-36">Locations</th>
+                    <th className="px-4 py-3 w-24 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        Mentioned
+                        <ChevronDown className="w-3 h-3" />
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 w-24 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        Avg Position
+                        <ChevronDown className="w-3 h-3" />
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 w-28 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        Sentiment
+                        <ChevronDown className="w-3 h-3" />
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 w-28 text-center">Citations</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {filteredQueries.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="px-4 py-12 text-center text-gray-500"
                       >
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {dateStr}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-sm text-gray-900 hover:underline">
-                            {query.query}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-center">
-                            <SourceIcon source={query.source} />
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {query.location ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-700">
-                                {query.location.city}
-                              </span>
-                              <span className="text-base">
-                                {query.location.flag}
-                              </span>
+                        {queries.length === 0
+                          ? "No queries found. Run some prompts to see data here."
+                          : "No queries match your search."}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredQueries.map((query) => {
+                      const dateObj = new Date(query.date);
+                      const dateStr = dateObj.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      });
+
+                      return (
+                        <tr
+                          key={query.id}
+                          className="hover:bg-gray-50/50 transition-colors cursor-pointer"
+                          onClick={() => {
+                            setSelectedQuery(query);
+                            setIsPanelOpen(true);
+                          }}
+                        >
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {dateStr}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-gray-900 hover:underline">
+                              {query.query}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-center">
+                              <SourceIcon source={query.source} />
                             </div>
-                          ) : (
-                            <span className="text-sm text-gray-300">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span
-                            className={`inline-flex items-center justify-center px-2 py-0.5 text-sm font-medium rounded ${
-                              query.mentioned.count > 0
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-gray-100 text-gray-600"
-                            }`}
-                          >
-                            {query.mentioned.count}/{query.mentioned.total}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {query.avgPosition !== null ? (
-                            <span className="inline-flex items-center justify-center px-2 py-0.5 text-sm font-medium bg-blue-50 text-blue-600 rounded">
-                              #{query.avgPosition}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center justify-center px-2 py-0.5 text-sm font-medium bg-rose-50 text-rose-600 rounded">
-                              N/A
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-center">
-                            {query.sentiment !== null ? (
-                              <div className="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full ${
-                                    query.sentiment >= 0
-                                      ? "bg-emerald-400"
-                                      : "bg-red-400"
-                                  }`}
-                                  style={{
-                                    width: `${
-                                      Math.abs(query.sentiment) * 50 + 50
-                                    }%`,
-                                  }}
-                                />
-                              </div>
-                            ) : (
-                              <div className="w-20 h-2 bg-gray-100 rounded-full" />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center">
-                            {query.citations.length > 0 ? (
-                              <div className="flex items-center -space-x-1.5">
-                                {query.citations.slice(0, 3).map((c, i) => (
-                                  <CitationDot key={i} domain={c.domain} />
-                                ))}
-                                {query.citations.length > 3 && (
-                                  <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
-                                    +{query.citations.length - 3}
-                                  </span>
-                                )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {query.location ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-700">
+                                  {query.location.city}
+                                </span>
+                                <span className="text-base">
+                                  {query.location.flag}
+                                </span>
                               </div>
                             ) : (
                               <span className="text-sm text-gray-300">—</span>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              className={`inline-flex items-center justify-center px-2 py-0.5 text-sm font-medium rounded ${
+                                query.mentioned.count > 0
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              {query.mentioned.count}/{query.mentioned.total}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {query.avgPosition !== null ? (
+                              <span className="inline-flex items-center justify-center px-2 py-0.5 text-sm font-medium bg-blue-50 text-blue-600 rounded">
+                                #{query.avgPosition}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center justify-center px-2 py-0.5 text-sm font-medium bg-rose-50 text-rose-600 rounded">
+                                N/A
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-center">
+                              {query.sentiment !== null ? (
+                                <div className="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      query.sentiment >= 0
+                                        ? "bg-emerald-400"
+                                        : "bg-red-400"
+                                    }`}
+                                    style={{
+                                      width: `${
+                                        Math.abs(query.sentiment) * 50 + 50
+                                      }%`,
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-20 h-2 bg-gray-100 rounded-full" />
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-center">
+                              {query.citations.length > 0 ? (
+                                <div className="flex items-center -space-x-1.5">
+                                  {query.citations.slice(0, 3).map((c, i) => (
+                                    <CitationDot key={i} domain={c.domain} />
+                                  ))}
+                                  {query.citations.length > 3 && (
+                                    <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                                      +{query.citations.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-sm text-gray-300">—</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 px-2">
+              <span className="text-sm text-gray-500">
+                Page {pagination.page} of {pagination.totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    setPagination((p) => ({
+                      ...p,
+                      page: Math.max(1, p.page - 1),
+                    }))
+                  }
+                  disabled={pagination.page <= 1}
+                  className="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() =>
+                    setPagination((p) => ({
+                      ...p,
+                      page: Math.min(p.totalPages, p.page + 1),
+                    }))
+                  }
+                  disabled={pagination.page >= pagination.totalPages}
+                  className="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           )}
         </div>
-
-        {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4 px-2">
-            <span className="text-sm text-gray-500">
-              Page {pagination.page} of {pagination.totalPages}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() =>
-                  setPagination((p) => ({
-                    ...p,
-                    page: Math.max(1, p.page - 1),
-                  }))
-                }
-                disabled={pagination.page <= 1}
-                className="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() =>
-                  setPagination((p) => ({
-                    ...p,
-                    page: Math.min(p.totalPages, p.page + 1),
-                  }))
-                }
-                disabled={pagination.page >= pagination.totalPages}
-                className="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Query Detail Panel */}

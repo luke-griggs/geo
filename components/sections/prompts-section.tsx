@@ -414,7 +414,16 @@ export function PromptsSection({
   }
 
   return (
-    <div className="flex flex-col h-full pt-4">
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Prompts</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Create and manage prompts to track how your brand appears in AI
+          responses
+        </p>
+      </div>
+
       {/* Header bar */}
       <div className="flex items-center justify-between gap-4 pb-4">
         {/* Left side - Search and filter */}

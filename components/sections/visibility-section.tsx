@@ -11,6 +11,8 @@ import {
 import { VisibilityChart } from "@/components/visibility/visibility-chart";
 import { IndustryRanking } from "@/components/visibility/industry-ranking";
 import { SourceDomainsSection } from "@/components/visibility/source-domains";
+import { YourMentions } from "@/components/visibility/your-mentions";
+import { AIModelPerformance } from "@/components/visibility/ai-model-performance";
 
 interface VisibilitySectionProps {
   workspaceId: string;
@@ -176,9 +178,9 @@ export function VisibilitySection({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div>
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Visibility</h1>
         <p className="text-sm text-gray-500 mt-1">
           Track how often your brand appears in AI responses compared to
@@ -186,76 +188,59 @@ export function VisibilitySection({
         </p>
       </div>
 
-      {/* Filter Bar */}
-      <FilterBar
-        timePeriod={timePeriod}
-        onTimePeriodChange={setTimePeriod}
-        platforms={platforms}
-        onPlatformsChange={setPlatforms}
-        selectedBrands={selectedBrands}
-        onBrandsChange={setSelectedBrands}
-        availableBrands={availableBrands}
-        competitorType={competitorType}
-        onCompetitorTypeChange={setCompetitorType}
-      />
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Visibility Chart */}
-        <VisibilityChart
-          data={visibilityData?.chartData || []}
-          currentScore={visibilityData?.visibilityScore || 0}
+      <div className="space-y-6">
+        {/* Filter Bar */}
+        <FilterBar
+          timePeriod={timePeriod}
+          onTimePeriodChange={setTimePeriod}
+          platforms={platforms}
+          onPlatformsChange={setPlatforms}
+          selectedBrands={selectedBrands}
+          onBrandsChange={setSelectedBrands}
+          availableBrands={availableBrands}
+          competitorType={competitorType}
+          onCompetitorTypeChange={setCompetitorType}
         />
 
-        {/* Industry Ranking */}
-        <IndustryRanking
-          data={visibilityData?.industryRanking || []}
-          userVisibility={visibilityData?.visibilityScore || 0}
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Visibility Chart */}
+          <VisibilityChart
+            data={visibilityData?.chartData || []}
+            currentScore={visibilityData?.visibilityScore || 0}
+          />
+
+          {/* Industry Ranking */}
+          <IndustryRanking
+            data={visibilityData?.industryRanking || []}
+            userVisibility={visibilityData?.visibilityScore || 0}
+          />
+        </div>
+
+        {/* Your Mentions & AI Model Performance */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <YourMentions
+            workspaceId={workspaceId}
+            domainId={domainId}
+            timePeriod={timePeriod}
+            platforms={platforms}
+          />
+          <AIModelPerformance
+            workspaceId={workspaceId}
+            domainId={domainId}
+            timePeriod={timePeriod}
+            platforms={platforms}
+          />
+        </div>
+
+        {/* Source Domains */}
+        <SourceDomainsSection
+          workspaceId={workspaceId}
+          domainId={domainId}
+          timePeriod={timePeriod}
+          platforms={platforms}
         />
       </div>
-
-      {/* Summary Stats */}
-      {visibilityData && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-sm text-gray-500">Total Prompts Run</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">
-              {visibilityData.totalPrompts}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-sm text-gray-500">Times Mentioned</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">
-              {visibilityData.totalMentions}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-sm text-gray-500">Competitors Tracked</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">
-              {
-                visibilityData.industryRanking.filter((r) => !r.isUserDomain)
-                  .length
-              }
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-sm text-gray-500">Your Rank</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">
-              #
-              {visibilityData.industryRanking.find((r) => r.isUserDomain)
-                ?.rank || "-"}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Source Domains */}
-      <SourceDomainsSection
-        workspaceId={workspaceId}
-        domainId={domainId}
-        timePeriod={timePeriod}
-        platforms={platforms}
-      />
 
       {/* Loading overlay for filter changes */}
       {isLoading && visibilityData && (
