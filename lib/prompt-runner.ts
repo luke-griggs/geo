@@ -1,8 +1,20 @@
 import db from "@/db";
-import { prompt, promptRun, mentionAnalysis, domain } from "@/db/schema";
+import {
+  prompt,
+  promptRun,
+  mentionAnalysis,
+  domain,
+  brandMention,
+} from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { generateId } from "./id";
-import { runPromptAgainstLLM, isLLMError, type LLMProvider } from "./llm";
+import {
+  runPromptAgainstLLM,
+  isLLMError,
+  extractBrandsWithGroq,
+  isBrandExtractionError,
+  type LLMProvider,
+} from "./llm";
 
 export interface RunResult {
   promptId: string;
@@ -63,6 +75,33 @@ function analyzeResponseForMentions(
   }
 
   return { mentioned, position, contextSnippet };
+}
+
+/**
+ * Extract and store brand mentions from a prompt response using Groq
+ */
+async function storeBrandMentions(
+  responseText: string,
+  promptRunId: string
+): Promise<void> {
+  const result = await extractBrandsWithGroq(responseText);
+
+  if (isBrandExtractionError(result)) {
+    console.error("Failed to extract brands with Groq:", result.error);
+    return;
+  }
+
+  for (const brand of result.brands) {
+    await db.insert(brandMention).values({
+      id: generateId(),
+      promptRunId,
+      brandName: brand.name,
+      brandDomain: brand.domain,
+      mentioned: true,
+      position: brand.position,
+      citationUrl: brand.citationUrl,
+    });
+  }
 }
 
 /**
@@ -145,6 +184,9 @@ export async function runPromptsForDomain(
         contextSnippet: analysis.contextSnippet,
       });
 
+      // Extract and store brand mentions from the response
+      await storeBrandMentions(response.text, promptRunId);
+
       results.push({
         promptId: p.id,
         promptRunId,
@@ -198,7 +240,10 @@ export async function runSinglePrompt(
   const promptRunId = generateId();
 
   try {
-    const response = await runPromptAgainstLLM(promptRecord.promptText, provider);
+    const response = await runPromptAgainstLLM(
+      promptRecord.promptText,
+      provider
+    );
 
     if (isLLMError(response)) {
       // Store the failed run
@@ -245,6 +290,9 @@ export async function runSinglePrompt(
       position: analysis.position,
       contextSnippet: analysis.contextSnippet,
     });
+
+    // Extract and store brand mentions from the response
+    await storeBrandMentions(response.text, promptRunId);
 
     return {
       promptId: promptRecord.id,

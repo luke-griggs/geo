@@ -7,22 +7,14 @@ import {
   ArrowRight,
   Check,
   Loader2,
-  Plus,
-  X,
   Globe,
   Building2,
-  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type OnboardingStep = "workspace" | "domain" | "competitors" | "complete";
+type OnboardingStep = "workspace" | "domain" | "complete";
 
-const STEPS: OnboardingStep[] = [
-  "workspace",
-  "domain",
-  "competitors",
-  "complete",
-];
+const STEPS: OnboardingStep[] = ["workspace", "domain", "complete"];
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -33,7 +25,6 @@ export default function OnboardingPage() {
   const [formData, setFormData] = useState({
     workspaceName: "",
     domain: "",
-    competitors: ["", "", ""],
   });
 
   const currentStepIndex = STEPS.indexOf(currentStep);
@@ -65,7 +56,6 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           name: formData.workspaceName,
           domain: formData.domain,
-          competitors: formData.competitors.filter((c) => c.trim() !== ""),
         }),
       });
 
@@ -88,8 +78,6 @@ export default function OnboardingPage() {
         return formData.workspaceName.trim().length > 0;
       case "domain":
         return formData.domain.trim().length > 0;
-      case "competitors":
-        return true; // Competitors are optional
       case "complete":
         return true;
       default:
@@ -113,30 +101,6 @@ export default function OnboardingPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentStep, canProceed, goNext, handleComplete]);
-
-  const addCompetitor = () => {
-    if (formData.competitors.length < 5) {
-      setFormData({
-        ...formData,
-        competitors: [...formData.competitors, ""],
-      });
-    }
-  };
-
-  const removeCompetitor = (index: number) => {
-    if (formData.competitors.length > 1) {
-      setFormData({
-        ...formData,
-        competitors: formData.competitors.filter((_, i) => i !== index),
-      });
-    }
-  };
-
-  const updateCompetitor = (index: number, value: string) => {
-    const newCompetitors = [...formData.competitors];
-    newCompetitors[index] = value;
-    setFormData({ ...formData, competitors: newCompetitors });
-  };
 
   return (
     <div className="min-h-screen flex">
@@ -326,63 +290,6 @@ export default function OnboardingPage() {
                 />
                 <p className="text-sm text-gray-400 mt-2">
                   You can enter with or without https://
-                </p>
-              </div>
-            )}
-
-            {currentStep === "competitors" && (
-              <div className="animate-in fade-in-0 slide-in-from-right-2">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-xl bg-[#faf9f7] flex items-center justify-center">
-                    <Users className="w-5 h-5 text-[#c9644a]" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Who are your competitors?
-                  </h2>
-                </div>
-                <p className="text-gray-600 mb-8">
-                  List your 3 main competitors{" "}
-                  <span className="text-gray-400">(up to 5 total)</span>
-                </p>
-
-                <div className="space-y-3">
-                  {formData.competitors.map((competitor, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="e.g. competitor.com"
-                        value={competitor}
-                        onChange={(e) =>
-                          updateCompetitor(index, e.target.value)
-                        }
-                        className="flex-1 px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#c9644a]/20 focus:border-[#c9644a] transition-colors"
-                      />
-                      {formData.competitors.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeCompetitor(index)}
-                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {formData.competitors.length < 5 && (
-                  <button
-                    type="button"
-                    onClick={addCompetitor}
-                    className="mt-4 flex items-center gap-2 text-sm text-[#c9644a] hover:text-[#b55840] font-medium"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add another competitor
-                  </button>
-                )}
-
-                <p className="text-sm text-gray-400 mt-4">
-                  This step is optional. You can skip and add competitors later.
                 </p>
               </div>
             )}

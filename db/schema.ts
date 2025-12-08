@@ -232,6 +232,7 @@ export const brandMention = pgTable(
       .notNull()
       .references(() => promptRun.id, { onDelete: "cascade" }),
     brandName: text("brand_name").notNull(),
+    brandDomain: text("brand_domain"), // e.g., "calendly.com" for favicon lookup
     mentioned: boolean("mentioned").default(false).notNull(),
     position: integer("position"), // 1st, 2nd, 3rd mention position
     sentimentScore: decimal("sentiment_score", { precision: 3, scale: 2 }), // -1.00 to 1.00
@@ -241,6 +242,7 @@ export const brandMention = pgTable(
   (table) => [
     index("brandMention_promptRunId_idx").on(table.promptRunId),
     index("brandMention_brandName_idx").on(table.brandName),
+    index("brandMention_brandDomain_idx").on(table.brandDomain),
   ]
 );
 

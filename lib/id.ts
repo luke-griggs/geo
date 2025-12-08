@@ -26,3 +26,4 @@ export function generateUniqueSlug(text: string): string {
   const randomSuffix = crypto.randomUUID().slice(0, 8);
   return `${baseSlug}-${randomSuffix}`;
 }
+

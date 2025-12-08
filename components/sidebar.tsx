@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronUp,
   AtSign,
+  Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -30,10 +31,16 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSession, signOut } from "@/lib/auth-client";
 
-type NavSection = "prompts" | "mentions" | "analytics" | "sources";
+type NavSection =
+  | "prompts"
+  | "visibility"
+  | "mentions"
+  | "analytics"
+  | "sources";
 
 const navItems = [
   { id: "prompts" as const, label: "Prompts", icon: FileText },
+  { id: "visibility" as const, label: "Visibility", icon: Eye },
   { id: "mentions" as const, label: "Mentions", icon: AtSign },
   { id: "analytics" as const, label: "Analytics", icon: BarChart3 },
   { id: "sources" as const, label: "Sources", icon: Database },
@@ -158,9 +165,7 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
                   <p className="text-sm font-medium text-gray-900">
                     {user.name}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {user.email}
-                  </p>
+                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="cursor-pointer flex items-center gap-2">
@@ -196,7 +201,9 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
                 alt="Logo"
                 className="w-5 h-5 object-contain flex-shrink-0"
               />
-              <span className="font-semibold text-gray-900 text-sm">GEO Analytics</span>
+              <span className="font-semibold text-gray-900 text-sm">
+                GEO Analytics
+              </span>
             </div>
 
             {/* Close button */}
@@ -267,9 +274,7 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
                   <p className="text-sm font-medium text-gray-900">
                     {user.name}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {user.email}
-                  </p>
+                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="cursor-pointer flex items-center gap-2">

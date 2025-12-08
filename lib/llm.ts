@@ -36,25 +36,19 @@ export async function runOpenAI(
   const startTime = Date.now();
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a helpful assistant providing information about products, services, and recommendations.",
-          },
-          {
-            role: "user",
-            content: promptText,
-          },
-        ],
+        input: promptText,
+        model: "gpt-5.1",
+        tools: [{ type: "web_search" }],
+        reasoning: {
+          effort: "none",
+        },
       }),
     });
 
@@ -67,12 +61,31 @@ export async function runOpenAI(
 
     const data = await response.json();
 
+    // Extract text from the nested response structure
+    // The output_text field is SDK-only, so we need to manually parse the output array
+    let text = "";
+    if (data.output && Array.isArray(data.output)) {
+      for (const item of data.output) {
+        if (
+          item.type === "message" &&
+          item.content &&
+          Array.isArray(item.content)
+        ) {
+          for (const contentItem of item.content) {
+            if (contentItem.type === "output_text" && contentItem.text) {
+              text += contentItem.text;
+            }
+          }
+        }
+      }
+    }
+
     return {
-      text: data.choices[0]?.message?.content || "",
+      text,
       metadata: {
         model: data.model,
         tokensUsed: data.usage?.total_tokens,
-        finishReason: data.choices[0]?.finish_reason,
+        finishReason: data.status,
       },
       durationMs,
     };
@@ -116,4 +129,141 @@ export function isLLMError(
   response: LLMResponse | LLMError
 ): response is LLMError {
   return "error" in response;
+}
+
+// ============================================
+// Brand Extraction using Groq
+// ============================================
+// TODO: we need a better way to extract brands from a response, this is a hacky solution
+
+export interface ExtractedBrand {
+  name: string;
+  domain: string | null; // e.g., "calendly.com" for favicon lookup
+  position: number;
+  citationUrl: string | null;
+}
+
+export interface BrandExtractionResult {
+  brands: ExtractedBrand[];
+}
+
+export interface BrandExtractionError {
+  error: string;
+}
+
+/**
+ * Extract brands/companies mentioned in an LLM response using Groq
+ */
+export async function extractBrandsWithGroq(
+  responseText: string
+): Promise<BrandExtractionResult | BrandExtractionError> {
+  const apiKey = process.env.GROQ_API_KEY;
+
+  if (!apiKey) {
+    return { error: "GROQ_API_KEY not configured" };
+  }
+
+  const systemPrompt = `You are a brand extraction assistant. Your job is to analyze text and identify product/service brands that are being recommended or discussed as options.
+
+INCLUDE:
+- Product brands (e.g., Trek, Specialized, Nike, Apple)
+- Software/SaaS brands (e.g., Calendly, Slack, Notion)
+- Service provider brands (e.g., Acuity Scheduling, Squarespace)
+
+DO NOT INCLUDE:
+- Retailers or stores (e.g., REI, Amazon, Best Buy, Walmart)
+- Blogs, publications, or media sites (e.g., Outdoor Life, TechCrunch, Wirecutter)
+- Review sites or aggregators (e.g., Yelp, TripAdvisor)
+- Sources/citations - only extract the actual brands being recommended, not who recommended them
+
+For each brand you find, return:
+- name: The brand/company name (properly capitalized)
+- domain: The brand's official website domain (e.g., "calendly.com", "trekbikes.com"). Just the domain, no https:// or paths.
+- position: The order in which it appears (1 for first, 2 for second, etc.)
+- citationUrl: If a URL is associated with this brand in the text, include it. Otherwise null.
+
+Return ONLY a valid JSON array of brand objects. No explanations, no markdown, just the JSON array.
+
+Example output:
+[{"name": "Calendly", "domain": "calendly.com", "position": 1, "citationUrl": null}, {"name": "Acuity Scheduling", "domain": "acuityscheduling.com", "position": 2, "citationUrl": "https://acuityscheduling.com"}]
+
+If no brands are mentioned, return an empty array: []`;
+
+  try {
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "meta-llama/llama-4-maverick-17b-128e-instruct",
+          messages: [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: responseText,
+            },
+          ],
+          temperature: 0.5, // Low temperature for consistent extraction
+          max_tokens: 1024,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      return { error: `Groq API error: ${error}` };
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      return { error: "No content in Groq response" };
+    }
+
+    // Parse the JSON response
+    try {
+      // Clean up the response in case there's any markdown formatting
+      const cleanedContent = content
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim();
+
+      const brands: ExtractedBrand[] = JSON.parse(cleanedContent);
+
+      // Validate and normalize the response
+      const validatedBrands = brands
+        .filter(
+          (b) =>
+            typeof b.name === "string" &&
+            b.name.length > 0 &&
+            typeof b.position === "number"
+        )
+        .map((b) => ({
+          name: b.name,
+          domain: typeof b.domain === "string" ? b.domain : null,
+          position: b.position,
+          citationUrl: typeof b.citationUrl === "string" ? b.citationUrl : null,
+        }));
+
+      return { brands: validatedBrands };
+    } catch {
+      console.error("Failed to parse Groq brand extraction response:", content);
+      return { error: "Failed to parse brand extraction response" };
+    }
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export function isBrandExtractionError(
+  result: BrandExtractionResult | BrandExtractionError
+): result is BrandExtractionError {
+  return "error" in result;
 }

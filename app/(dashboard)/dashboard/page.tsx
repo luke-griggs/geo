@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Sidebar, type NavSection } from "@/components/sidebar";
 import { PromptsSection } from "@/components/sections/prompts-section";
+import { VisibilitySection } from "@/components/sections/visibility-section";
 import { MentionsSection } from "@/components/sections/mentions-section";
 import { AnalyticsSection } from "@/components/sections/analytics-section";
 import { SourcesSection } from "@/components/sections/sources-section";
@@ -31,7 +32,9 @@ function DashboardContent() {
 
   const activeSection: NavSection =
     sectionParam &&
-    ["prompts", "mentions", "analytics", "sources"].includes(sectionParam)
+    ["prompts", "visibility", "mentions", "analytics", "sources"].includes(
+      sectionParam
+    )
       ? (sectionParam as NavSection)
       : "prompts";
 
@@ -50,7 +53,7 @@ function DashboardContent() {
           throw new Error("Failed to fetch workspaces");
         }
         const data = await res.json();
-        
+
         // Use the first workspace (most recent)
         if (data.workspaces && data.workspaces.length > 0) {
           setWorkspace(data.workspaces[0]);
@@ -125,8 +128,15 @@ function DashboardContent() {
       <main className="flex-1 ml-64 transition-[margin] duration-200">
         <div className="p-8 h-screen overflow-auto">
           {activeSection === "prompts" && (
-            <PromptsSection 
-              workspaceId={workspace.id} 
+            <PromptsSection
+              workspaceId={workspace.id}
+              domainId={domain.id}
+              domainName={domain.domain}
+            />
+          )}
+          {activeSection === "visibility" && (
+            <VisibilitySection
+              workspaceId={workspace.id}
               domainId={domain.id}
               domainName={domain.domain}
             />
@@ -147,4 +157,3 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
-
