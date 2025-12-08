@@ -29,10 +29,10 @@ export interface LLMResponse {
  * Returns the og:description or meta description tag content
  */
 async function fetchMetaDescription(url: string): Promise<string | undefined> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
+  try {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -40,8 +40,6 @@ async function fetchMetaDescription(url: string): Promise<string | undefined> {
           "Mozilla/5.0 (compatible; GeoBot/1.0; +https://example.com)",
       },
     });
-
-    clearTimeout(timeoutId);
 
     if (!response.ok) return undefined;
 
@@ -83,6 +81,8 @@ async function fetchMetaDescription(url: string): Promise<string | undefined> {
   } catch {
     // Silently fail - description is optional
     return undefined;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
