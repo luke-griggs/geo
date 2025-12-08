@@ -14,6 +14,7 @@ export interface LLMResponse {
     finishReason?: string;
   };
   durationMs: number;
+  searchQueries?: string[]; // queries the model passed to the web search tool
 }
 
 export interface LLMError {
@@ -64,8 +65,16 @@ export async function runOpenAI(
     // Extract text from the nested response structure
     // The output_text field is SDK-only, so we need to manually parse the output array
     let text = "";
+    const searchQueries: string[] = [];
+
     if (data.output && Array.isArray(data.output)) {
       for (const item of data.output) {
+        // Extract search queries from web_search_call items
+        if (item.type === "web_search_call" && item.action?.query) {
+          searchQueries.push(item.action.query);
+        }
+
+        // Extract text from message items
         if (
           item.type === "message" &&
           item.content &&
@@ -88,6 +97,7 @@ export async function runOpenAI(
         finishReason: data.status,
       },
       durationMs,
+      searchQueries: searchQueries.length > 0 ? searchQueries : undefined,
     };
   } catch (error) {
     return {

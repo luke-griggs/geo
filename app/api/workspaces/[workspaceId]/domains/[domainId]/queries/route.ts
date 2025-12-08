@@ -193,6 +193,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         sentiment,
         citations,
         response: run.responseText,
+        searchQueries: run.searchQueries as string[] | null, // queries the model passed to the web search tool
         brandMentions: run.brandMentions.map((b) => ({
           id: b.id,
           brandName: b.brandName,

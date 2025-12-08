@@ -164,6 +164,7 @@ export async function runPromptsForDomain(
         llmProvider: provider,
         responseText: response.text,
         responseMetadata: response.metadata,
+        searchQueries: response.searchQueries,
         durationMs: response.durationMs,
         executedAt: new Date(),
       });
@@ -271,6 +272,7 @@ export async function runSinglePrompt(
       llmProvider: provider,
       responseText: response.text,
       responseMetadata: response.metadata,
+      searchQueries: response.searchQueries,
       durationMs: response.durationMs,
       executedAt: new Date(),
     });

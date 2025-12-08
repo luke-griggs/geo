@@ -189,6 +189,7 @@ export const promptRun = pgTable(
     llmProvider: llmProviderEnum("llm_provider").notNull(),
     responseText: text("response_text"),
     responseMetadata: jsonb("response_metadata"), // tokens used, model version, etc.
+    searchQueries: jsonb("search_queries").$type<string[]>(), // queries the model passed to the web search tool
     executedAt: timestamp("executed_at").defaultNow().notNull(),
     durationMs: integer("duration_ms"),
     error: text("error"), // Store error if request failed

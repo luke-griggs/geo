@@ -43,6 +43,13 @@
       "when": 1765169926155,
       "tag": "0005_spotty_meggan",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1765221696502,
+      "tag": "0006_add-search-queries",
+      "breakpoints": true
     }
   ]
 }
