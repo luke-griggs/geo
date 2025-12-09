@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/db";
 import { organization, organizationMember } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
-// Alias for backward compatibility
-const workspace = organization;
+type Params = Promise<{ organizationId: string }>;
 
-type Params = Promise<{ workspaceId: string }>;
-
-// Helper to check organization access
+// Helper to check if user has access to organization
 async function checkOrgAccess(organizationId: string, userId: string) {
+  // Check if user is creator or member
   const org = await db.query.organization.findFirst({
     where: eq(organization.id, organizationId),
   });
@@ -32,13 +30,13 @@ async function checkOrgAccess(organizationId: string, userId: string) {
   return membership ? org : null;
 }
 
-// GET /api/workspaces/[workspaceId] - Get a single workspace
+// GET /api/organizations/[organizationId] - Get a single organization
 export async function GET(
   request: NextRequest,
   { params }: { params: Params }
 ) {
   try {
-    const { workspaceId } = await params;
+    const { organizationId } = await params;
     const session = await auth.api.getSession({
       headers: await headers(),
     });
@@ -47,17 +45,18 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const org = await checkOrgAccess(workspaceId, session.user.id);
+    const org = await checkOrgAccess(organizationId, session.user.id);
 
     if (!org) {
       return NextResponse.json(
-        { error: "Workspace not found" },
+        { error: "Organization not found" },
         { status: 404 }
       );
     }
 
+    // Get full organization with domains and members
     const result = await db.query.organization.findFirst({
-      where: eq(organization.id, workspaceId),
+      where: eq(organization.id, organizationId),
       with: {
         domains: {
           with: {
@@ -72,23 +71,23 @@ export async function GET(
       },
     });
 
-    return NextResponse.json({ workspace: result });
+    return NextResponse.json({ organization: result });
   } catch (error) {
-    console.error("Error fetching workspace:", error);
+    console.error("Error fetching organization:", error);
     return NextResponse.json(
-      { error: "Failed to fetch workspace" },
+      { error: "Failed to fetch organization" },
       { status: 500 }
     );
   }
 }
 
-// PUT /api/workspaces/[workspaceId] - Update a workspace
+// PUT /api/organizations/[organizationId] - Update an organization
 export async function PUT(
   request: NextRequest,
   { params }: { params: Params }
 ) {
   try {
-    const { workspaceId } = await params;
+    const { organizationId } = await params;
     const session = await auth.api.getSession({
       headers: await headers(),
     });
@@ -100,18 +99,18 @@ export async function PUT(
     // Check if user has admin/owner access
     const membership = await db.query.organizationMember.findFirst({
       where: and(
-        eq(organizationMember.organizationId, workspaceId),
+        eq(organizationMember.organizationId, organizationId),
         eq(organizationMember.userId, session.user.id)
       ),
     });
 
     const org = await db.query.organization.findFirst({
-      where: eq(organization.id, workspaceId),
+      where: eq(organization.id, organizationId),
     });
 
     if (!org) {
       return NextResponse.json(
-        { error: "Workspace not found" },
+        { error: "Organization not found" },
         { status: 404 }
       );
     }
@@ -124,7 +123,7 @@ export async function PUT(
 
     if (!isCreator && !hasAdminAccess) {
       return NextResponse.json(
-        { error: "You don't have permission to update this workspace" },
+        { error: "You don't have permission to update this organization" },
         { status: 403 }
       );
     }
@@ -139,26 +138,26 @@ export async function PUT(
     const [updated] = await db
       .update(organization)
       .set(updateData)
-      .where(eq(organization.id, workspaceId))
+      .where(eq(organization.id, organizationId))
       .returning();
 
-    return NextResponse.json({ workspace: updated });
+    return NextResponse.json({ organization: updated });
   } catch (error) {
-    console.error("Error updating workspace:", error);
+    console.error("Error updating organization:", error);
     return NextResponse.json(
-      { error: "Failed to update workspace" },
+      { error: "Failed to update organization" },
       { status: 500 }
     );
   }
 }
 
-// DELETE /api/workspaces/[workspaceId] - Delete a workspace
+// DELETE /api/organizations/[organizationId] - Delete an organization
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Params }
 ) {
   try {
-    const { workspaceId } = await params;
+    const { organizationId } = await params;
     const session = await auth.api.getSession({
       headers: await headers(),
     });
@@ -169,19 +168,19 @@ export async function DELETE(
 
     // Only creator or owner can delete
     const org = await db.query.organization.findFirst({
-      where: eq(organization.id, workspaceId),
+      where: eq(organization.id, organizationId),
     });
 
     if (!org) {
       return NextResponse.json(
-        { error: "Workspace not found" },
+        { error: "Organization not found" },
         { status: 404 }
       );
     }
 
     const membership = await db.query.organizationMember.findFirst({
       where: and(
-        eq(organizationMember.organizationId, workspaceId),
+        eq(organizationMember.organizationId, organizationId),
         eq(organizationMember.userId, session.user.id),
         eq(organizationMember.role, "owner")
       ),
@@ -189,18 +188,18 @@ export async function DELETE(
 
     if (org.userId !== session.user.id && !membership) {
       return NextResponse.json(
-        { error: "Only the workspace owner can delete it" },
+        { error: "Only the organization owner can delete it" },
         { status: 403 }
       );
     }
 
-    await db.delete(organization).where(eq(organization.id, workspaceId));
+    await db.delete(organization).where(eq(organization.id, organizationId));
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting workspace:", error);
+    console.error("Error deleting organization:", error);
     return NextResponse.json(
-      { error: "Failed to delete workspace" },
+      { error: "Failed to delete organization" },
       { status: 500 }
     );
   }

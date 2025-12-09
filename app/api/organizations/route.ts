@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import db from "@/db";
 import { organization, organizationMember, domain } from "@/db/schema";
 import { generateId, generateUniqueSlug } from "@/lib/id";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
-// GET /api/workspaces - List all workspaces/organizations for the current user
+// GET /api/organizations - List all organizations for the current user
 export async function GET() {
   try {
     const session = await auth.api.getSession({
@@ -17,57 +17,63 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get organizations created by the user
+    // Get organizations where user is the creator OR is a member
+    const memberships = await db.query.organizationMember.findMany({
+      where: eq(organizationMember.userId, session.user.id),
+      with: {
+        organization: {
+          with: {
+            domains: true,
+            members: {
+              with: {
+                user: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Also get organizations created by the user (in case membership wasn't created)
     const createdOrgs = await db.query.organization.findMany({
       where: eq(organization.userId, session.user.id),
       with: {
         domains: true,
+        members: {
+          with: {
+            user: true,
+          },
+        },
       },
     });
 
-    // Get organizations where user is a member
-    const memberships = await db.query.organizationMember.findMany({
-      where: eq(organizationMember.userId, session.user.id),
-    });
-
-    // Fetch full org details for memberships
-    const memberOrgIds = memberships
-      .map((m) => m.organizationId)
-      .filter((id) => !createdOrgs.some((org) => org.id === id));
-
-    const memberOrgs: typeof createdOrgs = [];
-    if (memberOrgIds.length > 0) {
-      // Fetch orgs the user is a member of but didn't create
-      for (const orgId of memberOrgIds) {
-        const org = await db.query.organization.findFirst({
-          where: eq(organization.id, orgId),
-          with: {
-            domains: true,
-          },
-        });
-        if (org) {
-          memberOrgs.push(org);
-        }
+    // Merge and dedupe
+    const orgMap = new Map<string, (typeof createdOrgs)[0]>();
+    for (const org of createdOrgs) {
+      orgMap.set(org.id, org);
+    }
+    for (const membership of memberships) {
+      if (!orgMap.has(membership.organization.id)) {
+        orgMap.set(membership.organization.id, membership.organization);
       }
     }
 
-    // Combine and sort
-    const workspaces = [...createdOrgs, ...memberOrgs].sort(
+    const organizations = Array.from(orgMap.values()).sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
-    return NextResponse.json({ workspaces });
+    return NextResponse.json({ organizations });
   } catch (error) {
-    console.error("Error fetching workspaces:", error);
+    console.error("Error fetching organizations:", error);
     return NextResponse.json(
-      { error: "Failed to fetch workspaces" },
+      { error: "Failed to fetch organizations" },
       { status: 500 }
     );
   }
 }
 
-// POST /api/workspaces - Create a new workspace/organization (and optionally a domain)
+// POST /api/organizations - Create a new organization (and optionally a domain)
 export async function POST(request: NextRequest) {
   try {
     const session = await auth.api.getSession({
@@ -85,14 +91,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    const workspaceId = generateId();
+    const organizationId = generateId();
     const slug = generateUniqueSlug(name);
 
-    // Create the organization (workspace)
-    const [newWorkspace] = await db
+    // Create the organization
+    const [newOrganization] = await db
       .insert(organization)
       .values({
-        id: workspaceId,
+        id: organizationId,
         name,
         slug,
         userId: session.user.id,
@@ -103,7 +109,7 @@ export async function POST(request: NextRequest) {
     const memberId = generateId();
     await db.insert(organizationMember).values({
       id: memberId,
-      organizationId: workspaceId,
+      organizationId: organizationId,
       userId: session.user.id,
       role: "owner",
     });
@@ -125,8 +131,8 @@ export async function POST(request: NextRequest) {
         .values({
           id: domainId,
           domain: cleanDomain,
-          name: name, // Use workspace name as domain friendly name
-          workspaceId: workspaceId,
+          name: name, // Use organization name as domain friendly name
+          workspaceId: organizationId, // Using workspaceId for backward compatibility
           verified: false,
         })
         .returning();
@@ -134,15 +140,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        workspace: newWorkspace,
+        organization: newOrganization,
         domain: newDomain,
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error("Error creating workspace:", error);
+    console.error("Error creating organization:", error);
     return NextResponse.json(
-      { error: "Failed to create workspace" },
+      { error: "Failed to create organization" },
       { status: 500 }
     );
   }

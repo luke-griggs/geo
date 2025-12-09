@@ -8,6 +8,9 @@ import {
   Calendar,
   ChevronDown,
   ExternalLink,
+  Archive,
+  RotateCcw,
+  Loader2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useState } from "react";
@@ -43,6 +46,9 @@ interface QueryDetailPanelProps {
   latestRun: PromptRun | null;
   isMentioned?: boolean;
   domainName?: string;
+  onArchive?: () => void;
+  isArchived?: boolean;
+  isArchiving?: boolean;
 }
 
 function getPlatformIcon(provider: string) {
@@ -145,6 +151,9 @@ export function QueryDetailPanel({
   latestRun,
   isMentioned,
   domainName,
+  onArchive,
+  isArchived,
+  isArchiving,
 }: QueryDetailPanelProps) {
   const [citationsExpanded, setCitationsExpanded] = useState(true);
 
@@ -181,10 +190,28 @@ export function QueryDetailPanel({
             <ChevronLeft className="h-4 w-4" />
             Back
           </button>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
-            <Download className="h-4 w-4" />
-            Export
-          </button>
+          <div className="flex items-center gap-2">
+            {onArchive && (
+              <button
+                onClick={onArchive}
+                disabled={isArchiving}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isArchiving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isArchived ? (
+                  <RotateCcw className="h-4 w-4" />
+                ) : (
+                  <Archive className="h-4 w-4" />
+                )}
+                {isArchived ? "Restore" : "Archive"}
+              </button>
+            )}
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+              <Download className="h-4 w-4" />
+              Export
+            </button>
+          </div>
         </div>
 
         {/* Content */}

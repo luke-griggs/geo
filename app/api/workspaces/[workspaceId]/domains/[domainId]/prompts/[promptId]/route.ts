@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import db from "@/db";
 import { prompt, domain, workspace } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 type Params = Promise<{
   workspaceId: string;
@@ -99,11 +101,16 @@ export async function PUT(
 ) {
   try {
     const { workspaceId, domainId, promptId } = await params;
-    const userId = request.headers.get("x-user-id");
 
-    if (!userId) {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const userId = session.user.id;
 
     const result = await verifyOwnership(
       workspaceId,

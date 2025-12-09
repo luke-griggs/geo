@@ -6,7 +6,7 @@ import {
   PanelLeft,
   PanelRight,
   FileText,
-  User,
+  Settings,
   LogOut,
   ChevronUp,
   ChevronDown,
@@ -234,29 +234,21 @@ export function Sidebar({
               <DropdownMenuContent
                 side="top"
                 align="center"
-                className="w-56 mb-2"
+                className="w-48 mb-2 p-1.5 shadow-lg rounded-xl border border-gray-200 animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-200"
               >
-                <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium text-gray-900">
-                    {user.name}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                </div>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => setSettingsOpen(true)}
-                  className="cursor-pointer flex items-center gap-2"
+                  className="cursor-pointer flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-100 focus:bg-gray-100"
                 >
-                  <User className="h-4 w-4" />
-                  Profile
+                  <Settings className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm">Manage account</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleLogout}
-                  className="text-red-600 focus:text-red-600 cursor-pointer flex items-center gap-2"
+                  className="cursor-pointer flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-100 focus:bg-gray-100"
                 >
-                  <LogOut className="h-4 w-4" />
-                  Log out
+                  <LogOut className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm">Sign out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -425,29 +417,21 @@ export function Sidebar({
               <DropdownMenuContent
                 side="top"
                 align="start"
-                className="w-56 mb-2"
+                className="w-48 mb-2 p-1.5 shadow-lg rounded-xl border border-gray-200 animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-200"
               >
-                <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium text-gray-900">
-                    {user.name}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                </div>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => setSettingsOpen(true)}
-                  className="cursor-pointer flex items-center gap-2"
+                  className="cursor-pointer flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-100 focus:bg-gray-100"
                 >
-                  <User className="h-4 w-4" />
-                  Profile
+                  <Settings className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm">Manage account</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleLogout}
-                  className="text-red-600 focus:text-red-600 cursor-pointer flex items-center gap-2"
+                  className="cursor-pointer flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-100 focus:bg-gray-100"
                 >
-                  <LogOut className="h-4 w-4" />
-                  Log out
+                  <LogOut className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm">Sign out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

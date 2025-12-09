@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
-type Params = Promise<{ workspaceId: string }>;
+type Params = Promise<{ organizationId: string }>;
 
 // Helper to check organization access
 async function checkOrgAccess(organizationId: string, userId: string) {
@@ -30,13 +30,13 @@ async function checkOrgAccess(organizationId: string, userId: string) {
   return membership ? org : null;
 }
 
-// GET /api/workspaces/[workspaceId]/domains - List all domains for a workspace
+// GET /api/organizations/[organizationId]/domains - List all domains
 export async function GET(
   request: NextRequest,
   { params }: { params: Params }
 ) {
   try {
-    const { workspaceId } = await params;
+    const { organizationId } = await params;
     const session = await auth.api.getSession({
       headers: await headers(),
     });
@@ -45,17 +45,17 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const org = await checkOrgAccess(workspaceId, session.user.id);
+    const org = await checkOrgAccess(organizationId, session.user.id);
 
     if (!org) {
       return NextResponse.json(
-        { error: "Workspace not found" },
+        { error: "Organization not found" },
         { status: 404 }
       );
     }
 
     const domains = await db.query.domain.findMany({
-      where: eq(domain.workspaceId, workspaceId),
+      where: eq(domain.workspaceId, organizationId),
       with: {
         prompts: true,
       },
@@ -72,13 +72,13 @@ export async function GET(
   }
 }
 
-// POST /api/workspaces/[workspaceId]/domains - Create a new domain
+// POST /api/organizations/[organizationId]/domains - Create a new domain
 export async function POST(
   request: NextRequest,
   { params }: { params: Params }
 ) {
   try {
-    const { workspaceId } = await params;
+    const { organizationId } = await params;
     const session = await auth.api.getSession({
       headers: await headers(),
     });
@@ -87,11 +87,11 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const org = await checkOrgAccess(workspaceId, session.user.id);
+    const org = await checkOrgAccess(organizationId, session.user.id);
 
     if (!org) {
       return NextResponse.json(
-        { error: "Workspace not found" },
+        { error: "Organization not found" },
         { status: 404 }
       );
     }
@@ -121,7 +121,7 @@ export async function POST(
         id,
         domain: cleanedDomain,
         name: name || cleanedDomain,
-        workspaceId,
+        workspaceId: organizationId,
       })
       .returning();
 

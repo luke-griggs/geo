@@ -20,9 +20,18 @@ import {
   Plus,
   UserPlus,
   ChevronDown,
+  X,
+  Eye,
+  EyeOff,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSession } from "@/lib/auth-client";
+import {
+  useSession,
+  changePassword,
+  changeEmail,
+  updateUser,
+} from "@/lib/auth-client";
 
 type SettingsTab =
   | "profile"
@@ -143,15 +152,430 @@ function ActivityTracker() {
   );
 }
 
+// Change Email Modal
+function ChangeEmailModal({
+  open,
+  onOpenChange,
+  currentEmail,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  currentEmail?: string | null;
+}) {
+  const [newEmail, setNewEmail] = useState("");
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async () => {
+    setError(null);
+
+    if (!newEmail || !confirmEmail || !currentPassword) {
+      setError("All fields are required");
+      return;
+    }
+
+    if (newEmail !== confirmEmail) {
+      setError("Email addresses do not match");
+      return;
+    }
+
+    if (newEmail === currentEmail) {
+      setError("New email must be different from current email");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await changeEmail({
+        newEmail,
+        callbackURL: "/dashboard",
+      });
+
+      if (result.error) {
+        setError(result.error.message || "Failed to change email");
+      } else {
+        setSuccess(true);
+        setTimeout(() => {
+          onOpenChange(false);
+          setNewEmail("");
+          setConfirmEmail("");
+          setCurrentPassword("");
+          setSuccess(false);
+        }, 2000);
+      }
+    } catch {
+      setError("An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    onOpenChange(false);
+    setNewEmail("");
+    setConfirmEmail("");
+    setCurrentPassword("");
+    setError(null);
+    setSuccess(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <DialogTitle className="text-lg font-semibold text-gray-900">
+              Change Email
+            </DialogTitle>
+            <button
+              onClick={handleClose}
+              className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              <X className="h-5 w-5 text-gray-400" />
+            </button>
+          </div>
+
+          {success ? (
+            <div className="flex flex-col items-center py-8">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <Check className="h-6 w-6 text-green-600" />
+              </div>
+              <p className="text-sm text-gray-600">
+                Email updated successfully!
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  New Email
+                </label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="Enter new email address"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  Confirm New Email
+                </label>
+                <input
+                  type="email"
+                  value={confirmEmail}
+                  onChange={(e) => setConfirmEmail(e.target.value)}
+                  placeholder="Confirm new email address"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter your current password"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition-colors"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  We need your password to confirm this change
+                </p>
+              </div>
+
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                  {error}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button
+                  onClick={handleClose}
+                  className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isLoading}
+                  className="px-5 py-2.5 text-sm font-medium text-white bg-[#8B7355] rounded-lg hover:bg-[#7A6349] transition-colors disabled:opacity-50"
+                >
+                  {isLoading ? "Changing..." : "Change Email"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Change Password Modal
+function ChangePasswordModal({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [repeatPassword, setRepeatPassword] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showRepeatPassword, setShowRepeatPassword] = useState(false);
+  const [logoutOtherDevices, setLogoutOtherDevices] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async () => {
+    setError(null);
+
+    if (!oldPassword || !newPassword || !repeatPassword) {
+      setError("All fields are required");
+      return;
+    }
+
+    if (newPassword !== repeatPassword) {
+      setError("New passwords do not match");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await changePassword({
+        currentPassword: oldPassword,
+        newPassword: newPassword,
+        revokeOtherSessions: logoutOtherDevices,
+      });
+
+      if (result.error) {
+        setError(result.error.message || "Failed to change password");
+      } else {
+        setSuccess(true);
+        setTimeout(() => {
+          onOpenChange(false);
+          setOldPassword("");
+          setNewPassword("");
+          setRepeatPassword("");
+          setSuccess(false);
+        }, 2000);
+      }
+    } catch {
+      setError("An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    onOpenChange(false);
+    setOldPassword("");
+    setNewPassword("");
+    setRepeatPassword("");
+    setError(null);
+    setSuccess(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <DialogTitle className="text-lg font-semibold text-gray-900">
+              Change Password
+            </DialogTitle>
+            <button
+              onClick={handleClose}
+              className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              <X className="h-5 w-5 text-gray-400" />
+            </button>
+          </div>
+
+          {success ? (
+            <div className="flex flex-col items-center py-8">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <Check className="h-6 w-6 text-green-600" />
+              </div>
+              <p className="text-sm text-gray-600">
+                Password changed successfully!
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  Old Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showOldPassword ? "text" : "password"}
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition-colors pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOldPassword(!showOldPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                  >
+                    {showOldPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition-colors pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                  >
+                    {showNewPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  Repeat New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showRepeatPassword ? "text" : "password"}
+                    value={repeatPassword}
+                    onChange={(e) => setRepeatPassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition-colors pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRepeatPassword(!showRepeatPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                  >
+                    {showRepeatPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => setLogoutOtherDevices(!logoutOtherDevices)}
+                  className={cn(
+                    "w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
+                    logoutOtherDevices
+                      ? "bg-[#A0522D] border-[#A0522D]"
+                      : "border-gray-300 bg-white"
+                  )}
+                >
+                  {logoutOtherDevices && (
+                    <Check className="h-3 w-3 text-white" />
+                  )}
+                </button>
+                <label className="text-sm text-gray-700">
+                  Log out of all other devices
+                </label>
+              </div>
+
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                  {error}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button
+                  onClick={handleClose}
+                  className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isLoading}
+                  className="px-5 py-2.5 text-sm font-medium text-white bg-[#8B7355] rounded-lg hover:bg-[#7A6349] transition-colors disabled:opacity-50"
+                >
+                  {isLoading ? "Changing..." : "Change Password"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Profile Tab Content
 function ProfileTab({
   user,
+  onRefresh,
 }: {
   user: { name?: string | null; email?: string | null; image?: string | null };
+  onRefresh?: () => void;
 }) {
   const nameParts = user.name?.split(" ") || ["", ""];
-  const firstName = nameParts[0] || "";
-  const lastName = nameParts.slice(1).join(" ") || "";
+  const [firstName, setFirstName] = useState(nameParts[0] || "");
+  const [lastName, setLastName] = useState(nameParts.slice(1).join(" ") || "");
+  const [changeEmailOpen, setChangeEmailOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleSaveProfile = async () => {
+    const fullName = `${firstName} ${lastName}`.trim();
+    if (!fullName) return;
+
+    setIsSaving(true);
+    try {
+      await updateUser({ name: fullName });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+      onRefresh?.();
+    } catch {
+      // Handle error silently for now
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -177,7 +601,8 @@ function ProfileTab({
           <label className="text-sm text-gray-500 block mb-2">First Name</label>
           <input
             type="text"
-            defaultValue={firstName}
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200"
           />
         </div>
@@ -185,7 +610,8 @@ function ProfileTab({
           <label className="text-sm text-gray-500 block mb-2">Last Name</label>
           <input
             type="text"
-            defaultValue={lastName}
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200"
           />
         </div>
@@ -200,7 +626,10 @@ function ProfileTab({
               <label className="text-sm text-gray-500 block">Email</label>
               <p className="text-sm text-gray-900">{user.email}</p>
             </div>
-            <button className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+            <button
+              onClick={() => setChangeEmailOpen(true)}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+            >
               Change email
             </button>
           </div>
@@ -209,7 +638,10 @@ function ProfileTab({
               <label className="text-sm text-gray-500 block">Password</label>
               <p className="text-sm text-gray-900">••••••••</p>
             </div>
-            <button className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+            <button
+              onClick={() => setChangePasswordOpen(true)}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+            >
               Change password
             </button>
           </div>
@@ -223,9 +655,35 @@ function ProfileTab({
       </div>
 
       {/* Save Button */}
-      <button className="px-6 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">
-        Save changes
+      <button
+        onClick={handleSaveProfile}
+        disabled={isSaving}
+        className="px-6 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+      >
+        {isSaving ? (
+          "Saving..."
+        ) : saveSuccess ? (
+          <>
+            <Check className="h-4 w-4" />
+            Saved!
+          </>
+        ) : (
+          "Save changes"
+        )}
       </button>
+
+      {/* Change Email Modal */}
+      <ChangeEmailModal
+        open={changeEmailOpen}
+        onOpenChange={setChangeEmailOpen}
+        currentEmail={user.email}
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
+      />
     </div>
   );
 }

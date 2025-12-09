@@ -119,7 +119,7 @@ export function SourceDomainsSection({
     const topDomains = data.sourceDomains.slice(0, 10);
     const otherDomains = data.sourceDomains.slice(10);
 
-    let segments = topDomains.map((d, i) => ({
+    const segments = topDomains.map((d, i) => ({
       domain: d.domain,
       frequency: d.frequency,
       color: CHART_COLORS[i % CHART_COLORS.length],

@@ -5,6 +5,7 @@ import {
   timestamp,
   boolean,
   index,
+  uniqueIndex,
   integer,
   jsonb,
   decimal,
@@ -27,6 +28,12 @@ export const llmProviderEnum = pgEnum("llm_provider", [
   "gemini",
   "grok",
   "deepseek",
+]);
+
+export const memberRoleEnum = pgEnum("member_role", [
+  "owner",
+  "admin",
+  "member",
 ]);
 
 // ============================================
@@ -109,12 +116,13 @@ export const verification = pgTable(
 // Core Application Tables
 // ============================================
 
-export const workspace = pgTable(
-  "workspace",
+export const organization = pgTable(
+  "organization",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
+    image: text("image"), // Organization icon/logo
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -125,8 +133,38 @@ export const workspace = pgTable(
       .notNull(),
   },
   (table) => [
-    index("workspace_userId_idx").on(table.userId),
-    index("workspace_slug_idx").on(table.slug),
+    index("organization_userId_idx").on(table.userId),
+    index("organization_slug_idx").on(table.slug),
+  ]
+);
+
+// Alias for backward compatibility in code
+export const workspace = organization;
+
+export const organizationMember = pgTable(
+  "organization_member",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: memberRoleEnum("role").notNull().default("member"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("organization_member_organizationId_idx").on(table.organizationId),
+    index("organization_member_userId_idx").on(table.userId),
+    uniqueIndex("organization_member_unique_idx").on(
+      table.organizationId,
+      table.userId
+    ),
   ]
 );
 
@@ -136,9 +174,11 @@ export const domain = pgTable(
     id: text("id").primaryKey(),
     domain: text("domain").notNull(),
     name: text("name"), // Friendly name for the domain
+    // Keep as workspace_id for backward compatibility (column name in DB)
+    // but it references the organization table (renamed from workspace)
     workspaceId: text("workspace_id")
       .notNull()
-      .references(() => workspace.id, { onDelete: "cascade" }),
+      .references(() => organization.id, { onDelete: "cascade" }),
     verified: boolean("verified").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -283,7 +323,8 @@ export const dailyMetrics = pgTable(
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
-  workspaces: many(workspace),
+  organizations: many(organization),
+  organizationMemberships: many(organizationMember),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -300,18 +341,36 @@ export const accountRelations = relations(account, ({ one }) => ({
   }),
 }));
 
-export const workspaceRelations = relations(workspace, ({ one, many }) => ({
-  user: one(user, {
-    fields: [workspace.userId],
-    references: [user.id],
-  }),
-  domains: many(domain),
-}));
+export const organizationRelations = relations(
+  organization,
+  ({ one, many }) => ({
+    creator: one(user, {
+      fields: [organization.userId],
+      references: [user.id],
+    }),
+    members: many(organizationMember),
+    domains: many(domain),
+  })
+);
+
+export const organizationMemberRelations = relations(
+  organizationMember,
+  ({ one }) => ({
+    organization: one(organization, {
+      fields: [organizationMember.organizationId],
+      references: [organization.id],
+    }),
+    user: one(user, {
+      fields: [organizationMember.userId],
+      references: [user.id],
+    }),
+  })
+);
 
 export const domainRelations = relations(domain, ({ one, many }) => ({
-  workspace: one(workspace, {
+  organization: one(organization, {
     fields: [domain.workspaceId],
-    references: [workspace.id],
+    references: [organization.id],
   }),
   prompts: many(prompt),
   mentionAnalyses: many(mentionAnalysis),

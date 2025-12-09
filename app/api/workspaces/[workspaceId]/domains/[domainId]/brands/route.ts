@@ -26,11 +26,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { domainId } = await params;
 
-    // Verify domain exists and belongs to user's workspace
+    // Verify domain exists and belongs to user's organization
     const domainRecord = await db.query.domain.findFirst({
       where: eq(domain.id, domainId),
       with: {
-        workspace: true,
+        organization: true,
       },
     });
 
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Domain not found" }, { status: 404 });
     }
 
-    if (domainRecord.workspace.userId !== session.user.id) {
+    if (domainRecord.organization.userId !== session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

@@ -615,9 +615,10 @@ export function MentionsSection({
   // Use aggregate stats from API (calculated from ALL data, not just current page)
   const stats = useMemo(() => {
     // Calculate change vs previous period (simplified placeholder)
+    // Both metrics use the same offset for consistent comparison
     const previousMentions = Math.max(0, aggregateStats.totalMentions - 2);
     const mentionsChange = aggregateStats.totalMentions - previousMentions;
-    const previousCitations = Math.max(0, aggregateStats.totalCitations - 1);
+    const previousCitations = Math.max(0, aggregateStats.totalCitations - 2);
     const citationsChange = aggregateStats.totalCitations - previousCitations;
 
     return {

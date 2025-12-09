@@ -41,14 +41,18 @@ export function VisibilityChart({ data, currentScore }: VisibilityChartProps) {
       const dateStr = date.toISOString().split("T")[0];
       const existing = dataMap.get(dateStr);
 
-      // If it's today (i === 0) and we have a currentScore but no data, use currentScore
-      // Otherwise use existing data or 0
-      let visibility = existing?.visibility || 0;
+      // Determine visibility value
+      let visibility: number;
 
-      // If this is the last day (today) and the value is 0 but we have a currentScore,
-      // allow the currentScore to override if the data seems missing
-      if (i === 0 && visibility === 0 && currentScore > 0) {
+      if (existing !== undefined) {
+        // Data point exists - use its value (even if it's legitimately 0)
+        visibility = existing.visibility;
+      } else if (i === 0 && currentScore > 0) {
+        // Today with no data point - use currentScore as fallback
         visibility = currentScore;
+      } else {
+        // No data point exists - default to 0
+        visibility = 0;
       }
 
       days.push({

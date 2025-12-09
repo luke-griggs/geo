@@ -1,9 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/db";
-import { domain, workspace } from "@/db/schema";
+import { domain, organization, organizationMember } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 type Params = Promise<{ workspaceId: string; domainId: string }>;
+
+// Helper to check organization access
+async function checkOrgAccess(organizationId: string, userId: string) {
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+  });
+
+  if (!org) return null;
+
+  // Check if user is creator
+  if (org.userId === userId) return org;
+
+  // Check if user is a member
+  const membership = await db.query.organizationMember.findFirst({
+    where: and(
+      eq(organizationMember.organizationId, organizationId),
+      eq(organizationMember.userId, userId)
+    ),
+  });
+
+  return membership ? org : null;
+}
 
 // Helper to verify ownership
 async function verifyOwnership(
@@ -11,11 +35,9 @@ async function verifyOwnership(
   domainId: string,
   userId: string
 ) {
-  const workspaceExists = await db.query.workspace.findFirst({
-    where: and(eq(workspace.id, workspaceId), eq(workspace.userId, userId)),
-  });
+  const org = await checkOrgAccess(workspaceId, userId);
 
-  if (!workspaceExists) {
+  if (!org) {
     return { error: "Workspace not found", status: 404 };
   }
 
@@ -37,13 +59,19 @@ export async function GET(
 ) {
   try {
     const { workspaceId, domainId } = await params;
-    const userId = request.headers.get("x-user-id");
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
 
-    if (!userId) {
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const result = await verifyOwnership(workspaceId, domainId, userId);
+    const result = await verifyOwnership(
+      workspaceId,
+      domainId,
+      session.user.id
+    );
     if ("error" in result) {
       return NextResponse.json(
         { error: result.error },
@@ -77,13 +105,19 @@ export async function PUT(
 ) {
   try {
     const { workspaceId, domainId } = await params;
-    const userId = request.headers.get("x-user-id");
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
 
-    if (!userId) {
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const result = await verifyOwnership(workspaceId, domainId, userId);
+    const result = await verifyOwnership(
+      workspaceId,
+      domainId,
+      session.user.id
+    );
     if ("error" in result) {
       return NextResponse.json(
         { error: result.error },
@@ -127,13 +161,19 @@ export async function DELETE(
 ) {
   try {
     const { workspaceId, domainId } = await params;
-    const userId = request.headers.get("x-user-id");
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
 
-    if (!userId) {
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const result = await verifyOwnership(workspaceId, domainId, userId);
+    const result = await verifyOwnership(
+      workspaceId,
+      domainId,
+      session.user.id
+    );
     if ("error" in result) {
       return NextResponse.json(
         { error: result.error },
@@ -152,7 +192,3 @@ export async function DELETE(
     );
   }
 }
-
-
-
-

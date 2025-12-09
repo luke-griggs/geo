@@ -64,6 +64,13 @@
       "when": 1765300000000,
       "tag": "0008_add-total-citations",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1765400000000,
+      "tag": "0009_rename-workspace-to-organization",
+      "breakpoints": true
     }
   ]
 }

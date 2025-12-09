@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/db";
-import { prompt, domain, workspace } from "@/db/schema";
+import { prompt, domain, organization, organizationMember } from "@/db/schema";
 import { generateId } from "@/lib/id";
 import { eq, and } from "drizzle-orm";
 import { runSinglePrompt } from "@/lib/prompt-runner";
@@ -10,17 +10,37 @@ import { headers } from "next/headers";
 
 type Params = Promise<{ workspaceId: string; domainId: string }>;
 
+// Helper to check organization access
+async function checkOrgAccess(organizationId: string, userId: string) {
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+  });
+
+  if (!org) return null;
+
+  // Check if user is creator
+  if (org.userId === userId) return org;
+
+  // Check if user is a member
+  const membership = await db.query.organizationMember.findFirst({
+    where: and(
+      eq(organizationMember.organizationId, organizationId),
+      eq(organizationMember.userId, userId)
+    ),
+  });
+
+  return membership ? org : null;
+}
+
 // Helper to verify ownership
 async function verifyOwnership(
   workspaceId: string,
   domainId: string,
   userId: string
 ) {
-  const workspaceExists = await db.query.workspace.findFirst({
-    where: and(eq(workspace.id, workspaceId), eq(workspace.userId, userId)),
-  });
+  const org = await checkOrgAccess(workspaceId, userId);
 
-  if (!workspaceExists) {
+  if (!org) {
     return { error: "Workspace not found", status: 404 };
   }
 
@@ -64,11 +84,18 @@ export async function GET(
     // Get query params for filtering
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get("active") === "true";
+    const archived = searchParams.get("archived") === "true";
+
+    // Build where conditions
+    const conditions = [eq(prompt.domainId, domainId)];
+    if (activeOnly) {
+      conditions.push(eq(prompt.isActive, true));
+    }
+    // Filter by archived status (default to showing non-archived)
+    conditions.push(eq(prompt.isArchived, archived));
 
     const prompts = await db.query.prompt.findMany({
-      where: activeOnly
-        ? and(eq(prompt.domainId, domainId), eq(prompt.isActive, true))
-        : eq(prompt.domainId, domainId),
+      where: and(...conditions),
       with: {
         runs: {
           orderBy: (run, { desc }) => [desc(run.executedAt)],

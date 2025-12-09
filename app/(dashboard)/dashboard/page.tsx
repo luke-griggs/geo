@@ -8,12 +8,16 @@ import { VisibilitySection } from "@/components/sections/visibility-section";
 import { MentionsSection } from "@/components/sections/mentions-section";
 import { Loader2 } from "lucide-react";
 
-interface Workspace {
+interface Organization {
   id: string;
   name: string;
   slug: string;
+  image?: string | null;
   domains: Domain[];
 }
+
+// Alias for backward compatibility
+type Workspace = Organization;
 
 function DashboardContent() {
   const router = useRouter();
