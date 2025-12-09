@@ -227,7 +227,7 @@ export function PromptDetailView({
       { mentions: number; totalPosition: number; count: number }
     > = {};
 
-    let totalRuns = prompt.runs.length;
+    const totalRuns = prompt.runs.length;
     if (totalRuns === 0) return [];
 
     prompt.runs.forEach((run) => {
@@ -380,7 +380,7 @@ export function PromptDetailView({
                         Track with AI models
                       </h3>
                       <p className="text-sm text-gray-500 mt-1">
-                        Select which AI models you'd like us to track this
+                        Select which AI models you&apos;d like us to track this
                         prompt with.
                       </p>
                     </div>

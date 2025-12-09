@@ -9,17 +9,27 @@ import {
   Loader2,
   Globe,
   Building2,
+  Sparkles,
+  Plus,
+  Hash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type OnboardingStep = "workspace" | "domain" | "complete";
+type OnboardingStep = "workspace" | "domain" | "topics" | "complete";
 
-const STEPS: OnboardingStep[] = ["workspace", "domain", "complete"];
+const STEPS: OnboardingStep[] = ["workspace", "domain", "topics", "complete"];
+
+interface TopicSuggestion {
+  name: string;
+  description: string;
+  selected: boolean;
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("workspace");
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingTopics, setIsGeneratingTopics] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -27,8 +37,15 @@ export default function OnboardingPage() {
     domain: "",
   });
 
+  const [topics, setTopics] = useState<TopicSuggestion[]>([]);
+  const [customTopic, setCustomTopic] = useState("");
+  const [hasGeneratedTopics, setHasGeneratedTopics] = useState(false);
+
   const currentStepIndex = STEPS.indexOf(currentStep);
   const progress = ((currentStepIndex + 1) / STEPS.length) * 100;
+
+  const selectedTopics = topics.filter((t) => t.selected);
+  const canSelectMore = selectedTopics.length < 10;
 
   const goBack = () => {
     const prevIndex = currentStepIndex - 1;
@@ -44,18 +61,95 @@ export default function OnboardingPage() {
     }
   }, [currentStepIndex]);
 
+  const toggleTopic = (index: number) => {
+    setTopics((prev) =>
+      prev.map((t, i) => {
+        if (i === index) {
+          // Can only select if under limit or deselecting
+          if (!t.selected && !canSelectMore) return t;
+          return { ...t, selected: !t.selected };
+        }
+        return t;
+      })
+    );
+  };
+
+  const addCustomTopic = useCallback(() => {
+    if (!customTopic.trim() || !canSelectMore) return;
+
+    // Check if topic already exists
+    const exists = topics.some(
+      (t) => t.name.toLowerCase() === customTopic.trim().toLowerCase()
+    );
+    if (exists) {
+      setCustomTopic("");
+      return;
+    }
+
+    setTopics((prev) => [
+      ...prev,
+      {
+        name: customTopic.trim(),
+        description: "Custom topic",
+        selected: true,
+      },
+    ]);
+    setCustomTopic("");
+  }, [customTopic, canSelectMore, topics]);
+
+  const generateTopics = async () => {
+    setIsGeneratingTopics(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/generate-topics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          domain: formData.domain,
+          workspaceName: formData.workspaceName,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to generate topics");
+      }
+
+      const data = await res.json();
+
+      // Set topics with first 5 pre-selected
+      setTopics(
+        (data.topics || []).map((t: TopicSuggestion, i: number) => ({
+          ...t,
+          selected: i < 5, // Pre-select first 5
+        }))
+      );
+      setHasGeneratedTopics(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to generate topics"
+      );
+    } finally {
+      setIsGeneratingTopics(false);
+    }
+  };
+
   const handleComplete = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // Create workspace and domain via API
+      // Create workspace, domain, and topics via API
       const workspaceRes = await fetch("/api/workspaces", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.workspaceName,
           domain: formData.domain,
+          topics: selectedTopics.map((t) => ({
+            name: t.name,
+            description: t.description,
+          })),
         }),
       });
 
@@ -70,7 +164,7 @@ export default function OnboardingPage() {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setIsLoading(false);
     }
-  }, [formData, router]);
+  }, [formData, selectedTopics, router]);
 
   const canProceed = useCallback(() => {
     switch (currentStep) {
@@ -78,12 +172,19 @@ export default function OnboardingPage() {
         return formData.workspaceName.trim().length > 0;
       case "domain":
         return formData.domain.trim().length > 0;
+      case "topics":
+        return selectedTopics.length > 0;
       case "complete":
         return true;
       default:
         return false;
     }
-  }, [currentStep, formData.workspaceName, formData.domain]);
+  }, [
+    currentStep,
+    formData.workspaceName,
+    formData.domain,
+    selectedTopics.length,
+  ]);
 
   // Handle Enter key to advance to next step
   useEffect(() => {
@@ -92,6 +193,9 @@ export default function OnboardingPage() {
         e.preventDefault();
         if (currentStep === "complete") {
           handleComplete();
+        } else if (currentStep === "topics" && customTopic.trim()) {
+          // If typing custom topic, add it instead of advancing
+          addCustomTopic();
         } else {
           goNext();
         }
@@ -100,7 +204,14 @@ export default function OnboardingPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentStep, canProceed, goNext, handleComplete]);
+  }, [
+    currentStep,
+    canProceed,
+    goNext,
+    handleComplete,
+    customTopic,
+    addCustomTopic,
+  ]);
 
   return (
     <div className="min-h-screen flex">
@@ -294,6 +405,160 @@ export default function OnboardingPage() {
               </div>
             )}
 
+            {currentStep === "topics" && (
+              <div className="animate-in fade-in-0 slide-in-from-right-2">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-xl bg-[#faf9f7] flex items-center justify-center">
+                    <Hash className="w-5 h-5 text-[#6366f1]" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Which topics do you want to create prompts for?
+                  </h2>
+                </div>
+                <p className="text-gray-600 mb-2">Select up to 10 topics</p>
+                <div className="h-1 bg-gray-100 rounded-full mb-6 w-48">
+                  <div
+                    className="h-full bg-[#6366f1] rounded-full transition-all"
+                    style={{ width: `${(selectedTopics.length / 10) * 100}%` }}
+                  />
+                </div>
+
+                {!hasGeneratedTopics ? (
+                  <div className="text-center py-8">
+                    <button
+                      onClick={generateTopics}
+                      disabled={isGeneratingTopics}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
+                    >
+                      {isGeneratingTopics ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Generating topics...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          Generate Topics
+                        </>
+                      )}
+                    </button>
+                    <p className="text-sm text-gray-500 mt-3">
+                      We&apos;ll suggest topics based on{" "}
+                      <strong>{formData.domain}</strong>
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Topic Selection */}
+                    <div className="space-y-2 mb-4 max-h-[320px] overflow-y-auto pr-2">
+                      {topics.map((topic, index) => (
+                        <button
+                          key={index}
+                          onClick={() => toggleTopic(index)}
+                          disabled={!topic.selected && !canSelectMore}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left",
+                            topic.selected
+                              ? "border-[#6366f1] bg-[#6366f1]/5"
+                              : "border-gray-200 hover:border-gray-300",
+                            !topic.selected &&
+                              !canSelectMore &&
+                              "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors",
+                              topic.selected
+                                ? "bg-[#6366f1]"
+                                : "border-2 border-gray-300"
+                            )}
+                          >
+                            {topic.selected && (
+                              <Check
+                                className="w-3 h-3 text-white"
+                                strokeWidth={3}
+                              />
+                            )}
+                          </div>
+                          <span className="text-sm font-medium text-gray-900">
+                            {topic.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Add Custom Topic */}
+                    <div className="flex items-center gap-2 mt-4">
+                      <div className="flex-1 relative">
+                        <Plus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Add custom"
+                          value={customTopic}
+                          onChange={(e) => setCustomTopic(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              addCustomTopic();
+                            }
+                          }}
+                          disabled={!canSelectMore}
+                          className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:outline-none focus:border-[#6366f1] transition-colors disabled:opacity-50"
+                        />
+                      </div>
+                      {customTopic.trim() && (
+                        <button
+                          onClick={addCustomTopic}
+                          disabled={!canSelectMore}
+                          className="px-4 py-2.5 text-sm font-medium text-[#6366f1] hover:bg-[#6366f1]/10 rounded-xl transition-colors disabled:opacity-50"
+                        >
+                          Add
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Tips Card */}
+                    <div className="mt-6 p-4 bg-gray-50 rounded-xl">
+                      <h4 className="font-medium text-gray-900 mb-2">
+                        Topic Selection Tips
+                      </h4>
+                      <ul className="space-y-2 text-sm text-gray-600">
+                        <li className="flex items-start gap-2">
+                          <Check className="w-4 h-4 text-[#6366f1] mt-0.5 flex-shrink-0" />
+                          <span>
+                            <strong>Each topic generates 5 prompts</strong> to
+                            track. We&apos;ll start you off with{" "}
+                            {selectedTopics.length} topics and{" "}
+                            {selectedTopics.length * 5} prompts. You can always
+                            add more later.
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Check className="w-4 h-4 text-[#6366f1] mt-0.5 flex-shrink-0" />
+                          <span>
+                            <strong>
+                              Try using keywords from traditional SEO
+                            </strong>
+                            . Pick common words or phrases that represent your
+                            brand.
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Check className="w-4 h-4 text-[#6366f1] mt-0.5 flex-shrink-0" />
+                          <span>
+                            <strong>Avoid long phrases</strong>. Remember these
+                            are topics not prompts.
+                          </span>
+                        </li>
+                      </ul>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {currentStep === "complete" && (
               <div className="animate-in fade-in-0 slide-in-from-right-2 text-center">
                 <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
@@ -302,10 +567,14 @@ export default function OnboardingPage() {
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">
                   You&apos;re all set!
                 </h2>
-                <p className="text-gray-600 mb-8">
+                <p className="text-gray-600 mb-4">
                   Your workspace <strong>{formData.workspaceName}</strong> is
-                  ready. We&apos;ll start tracking{" "}
-                  <strong>{formData.domain}</strong> right away.
+                  ready with {selectedTopics.length} topics and{" "}
+                  {selectedTopics.length * 5} prompts.
+                </p>
+                <p className="text-sm text-gray-500 mb-8">
+                  We&apos;ll start tracking <strong>{formData.domain}</strong>{" "}
+                  right away.
                 </p>
 
                 {error && (
@@ -322,7 +591,7 @@ export default function OnboardingPage() {
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Setting up...
+                      Setting up your workspace...
                     </>
                   ) : (
                     <>
@@ -372,7 +641,7 @@ export default function OnboardingPage() {
                     : "bg-gray-100 text-gray-400 cursor-not-allowed"
                 )}
               >
-                Continue
+                {currentStep === "topics" ? "Looks good" : "Continue"}
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}

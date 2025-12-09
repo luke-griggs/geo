@@ -86,7 +86,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Build prompt run query conditions
-    let promptRunConditions = and(
+    const promptRunConditions = and(
       inArray(promptRun.promptId, promptIds),
       gte(promptRun.executedAt, startDate),
       lte(promptRun.executedAt, endDate)

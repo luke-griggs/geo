@@ -67,6 +67,19 @@ interface LocationSuggestion {
   displayName: string;
 }
 
+// Nominatim API response item
+interface NominatimResult {
+  name: string;
+  address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    state?: string;
+    county?: string;
+    country?: string;
+  };
+}
+
 export function AddDomainModal({
   open,
   onOpenChange,
@@ -142,25 +155,27 @@ export function AddDomainModal({
         );
         const data = await response.json();
 
-        const suggestions: LocationSuggestion[] = data.map((item: any) => ({
-          name:
-            item.address?.city ||
-            item.address?.town ||
-            item.address?.village ||
-            item.name,
-          region: item.address?.state || item.address?.county || "",
-          country: item.address?.country || "",
-          displayName: [
-            item.address?.city ||
+        const suggestions: LocationSuggestion[] = data.map(
+          (item: NominatimResult) => ({
+            name:
+              item.address?.city ||
               item.address?.town ||
               item.address?.village ||
               item.name,
-            item.address?.state || item.address?.county,
-            item.address?.country,
-          ]
-            .filter(Boolean)
-            .join(", "),
-        }));
+            region: item.address?.state || item.address?.county || "",
+            country: item.address?.country || "",
+            displayName: [
+              item.address?.city ||
+                item.address?.town ||
+                item.address?.village ||
+                item.name,
+              item.address?.state || item.address?.county,
+              item.address?.country,
+            ]
+              .filter(Boolean)
+              .join(", "),
+          })
+        );
 
         setLocationSuggestions(suggestions);
       } catch (error) {

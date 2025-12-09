@@ -46,3 +46,4 @@ WHERE NOT EXISTS (
   SELECT 1 FROM "organization_member" om 
   WHERE om."organization_id" = o."id" AND om."user_id" = o."user_id"
 );
+

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Sidebar, type NavSection, type Domain } from "@/components/sidebar";
+import { OverviewSection } from "@/components/sections/overview-section";
 import { PromptsSection } from "@/components/sections/prompts-section";
 import { VisibilitySection } from "@/components/sections/visibility-section";
 import { MentionsSection } from "@/components/sections/mentions-section";
@@ -31,9 +32,10 @@ function DashboardContent() {
   const [error, setError] = useState<string | null>(null);
 
   const activeSection: NavSection =
-    sectionParam && ["prompts", "visibility", "mentions"].includes(sectionParam)
+    sectionParam &&
+    ["overview", "prompts", "visibility", "mentions"].includes(sectionParam)
       ? (sectionParam as NavSection)
-      : "prompts";
+      : "overview";
 
   const handleSectionChange = (section: NavSection) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -161,6 +163,14 @@ function DashboardContent() {
       {/* Main content */}
       <main className="flex-1 ml-64 transition-[margin] duration-200">
         <div className="p-8 pb-16 h-screen overflow-auto">
+          {activeSection === "overview" && (
+            <OverviewSection
+              workspaceId={workspace.id}
+              domainId={domain.id}
+              domainName={domain.domain}
+              onNavigate={handleSectionChange}
+            />
+          )}
           {activeSection === "prompts" && (
             <PromptsSection
               workspaceId={workspace.id}

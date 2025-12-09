@@ -192,6 +192,27 @@ export const domain = pgTable(
   ]
 );
 
+export const topic = pgTable(
+  "topic",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    domainId: text("domain_id")
+      .notNull()
+      .references(() => domain.id, { onDelete: "cascade" }),
+    description: text("description"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("topic_domainId_idx").on(table.domainId),
+    index("topic_name_idx").on(table.name),
+  ]
+);
+
 export const prompt = pgTable(
   "prompt",
   {
@@ -201,6 +222,9 @@ export const prompt = pgTable(
     domainId: text("domain_id")
       .notNull()
       .references(() => domain.id, { onDelete: "cascade" }),
+    topicId: text("topic_id").references(() => topic.id, {
+      onDelete: "set null",
+    }),
     isActive: boolean("is_active").default(true).notNull(),
     isArchived: boolean("is_archived").default(false).notNull(),
     location: text("location"), // e.g., "Chicago, US" for location-based queries
@@ -215,6 +239,7 @@ export const prompt = pgTable(
   },
   (table) => [
     index("prompt_domainId_idx").on(table.domainId),
+    index("prompt_topicId_idx").on(table.topicId),
     index("prompt_isActive_idx").on(table.isActive),
   ]
 );
@@ -372,15 +397,28 @@ export const domainRelations = relations(domain, ({ one, many }) => ({
     fields: [domain.workspaceId],
     references: [organization.id],
   }),
+  topics: many(topic),
   prompts: many(prompt),
   mentionAnalyses: many(mentionAnalysis),
   dailyMetrics: many(dailyMetrics),
+}));
+
+export const topicRelations = relations(topic, ({ one, many }) => ({
+  domain: one(domain, {
+    fields: [topic.domainId],
+    references: [domain.id],
+  }),
+  prompts: many(prompt),
 }));
 
 export const promptRelations = relations(prompt, ({ one, many }) => ({
   domain: one(domain, {
     fields: [prompt.domainId],
     references: [domain.id],
+  }),
+  topic: one(topic, {
+    fields: [prompt.topicId],
+    references: [topic.id],
   }),
   runs: many(promptRun),
 }));

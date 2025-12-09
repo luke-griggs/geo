@@ -15,6 +15,7 @@ import {
   Plus,
   Check,
   Search,
+  LayoutDashboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -35,7 +36,7 @@ import { useSession, signOut } from "@/lib/auth-client";
 import { AccountSettingsModal } from "@/components/account-settings-modal";
 import { AddDomainModal } from "@/components/add-domain-modal";
 
-type NavSection = "prompts" | "visibility" | "mentions";
+type NavSection = "overview" | "prompts" | "visibility" | "mentions";
 
 interface Domain {
   id: string;
@@ -44,6 +45,7 @@ interface Domain {
 }
 
 const navItems = [
+  { id: "overview" as const, label: "Overview", icon: LayoutDashboard },
   { id: "visibility" as const, label: "Visibility", icon: Eye },
   { id: "mentions" as const, label: "Mentions", icon: AtSign },
   { id: "prompts" as const, label: "Prompts", icon: FileText },
