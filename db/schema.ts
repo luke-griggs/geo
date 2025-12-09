@@ -123,6 +123,8 @@ export const organization = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     image: text("image"), // Organization icon/logo
+    companySize: text("company_size"), // "1-10", "11-100", "101-500", "501-1000", "1001+"
+    isAgency: boolean("is_agency").default(false),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),

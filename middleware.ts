@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // Public routes that don't require authentication
-const publicRoutes = ["/", "/sign-in", "/sign-up"];
+const publicRoutes = ["/", "/sign-in", "/sign-up", "/onboarding"];
 
 // Auth API routes - should always be accessible
 const authApiRoutes = ["/api/auth"];
@@ -31,8 +31,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  // If user is authenticated and on sign-in/sign-up, redirect to dashboard
-  if (isAuthenticated && (pathname === "/sign-in" || pathname === "/sign-up")) {
+  // If user is authenticated and on auth pages, redirect to dashboard
+  if (
+    isAuthenticated &&
+    (pathname === "/sign-in" ||
+      pathname === "/sign-up" ||
+      pathname === "/onboarding")
+  ) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
@@ -56,4 +61,3 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
-

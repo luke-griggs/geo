@@ -1,650 +1,927 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Loader2,
-  Globe,
-  Building2,
-  Sparkles,
-  Plus,
-  Hash,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ArrowLeft, ArrowUpRight, Loader2, Eye, EyeOff } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { emailOtp, signIn } from "@/lib/auth-client";
 
-type OnboardingStep = "workspace" | "domain" | "topics" | "complete";
+type OnboardingStep = "email" | "signin" | "company" | "account" | "verify";
 
-const STEPS: OnboardingStep[] = ["workspace", "domain", "topics", "complete"];
-
-interface TopicSuggestion {
-  name: string;
-  description: string;
-  selected: boolean;
-}
+const COMPANY_SIZES = [
+  "1-10 employees",
+  "11-100 employees",
+  "101-500 employees",
+  "501-1000 employees",
+  "1001+ employees",
+] as const;
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>("workspace");
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>("email");
+  const [direction, setDirection] = useState<"left" | "right">("right");
   const [isLoading, setIsLoading] = useState(false);
-  const [isGeneratingTopics, setIsGeneratingTopics] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
-    workspaceName: "",
-    domain: "",
-  });
+  // Form data
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [companySize, setCompanySize] = useState<string | null>(null);
+  const [isAgency, setIsAgency] = useState(false);
+  const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
+  const [resendTimer, setResendTimer] = useState(60);
+  const [canResend, setCanResend] = useState(false);
 
-  const [topics, setTopics] = useState<TopicSuggestion[]>([]);
-  const [customTopic, setCustomTopic] = useState("");
-  const [hasGeneratedTopics, setHasGeneratedTopics] = useState(false);
+  // Refs for OTP inputs
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const currentStepIndex = STEPS.indexOf(currentStep);
-  const progress = ((currentStepIndex + 1) / STEPS.length) * 100;
-
-  const selectedTopics = topics.filter((t) => t.selected);
-  const canSelectMore = selectedTopics.length < 10;
-
-  const goBack = () => {
-    const prevIndex = currentStepIndex - 1;
-    if (prevIndex >= 0) {
-      setCurrentStep(STEPS[prevIndex]);
+  // Resend countdown timer
+  useEffect(() => {
+    if (currentStep === "verify" && resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (resendTimer === 0) {
+      setCanResend(true);
     }
+  }, [currentStep, resendTimer]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   };
 
-  const goNext = useCallback(() => {
-    const nextIndex = currentStepIndex + 1;
-    if (nextIndex < STEPS.length) {
-      setCurrentStep(STEPS[nextIndex]);
-    }
-  }, [currentStepIndex]);
-
-  const toggleTopic = (index: number) => {
-    setTopics((prev) =>
-      prev.map((t, i) => {
-        if (i === index) {
-          // Can only select if under limit or deselecting
-          if (!t.selected && !canSelectMore) return t;
-          return { ...t, selected: !t.selected };
-        }
-        return t;
-      })
-    );
+  const goToStep = (newStep: OnboardingStep, dir: "left" | "right") => {
+    setDirection(dir);
+    setCurrentStep(newStep);
   };
 
-  const addCustomTopic = useCallback(() => {
-    if (!customTopic.trim() || !canSelectMore) return;
-
-    // Check if topic already exists
-    const exists = topics.some(
-      (t) => t.name.toLowerCase() === customTopic.trim().toLowerCase()
-    );
-    if (exists) {
-      setCustomTopic("");
-      return;
-    }
-
-    setTopics((prev) => [
-      ...prev,
-      {
-        name: customTopic.trim(),
-        description: "Custom topic",
-        selected: true,
-      },
-    ]);
-    setCustomTopic("");
-  }, [customTopic, canSelectMore, topics]);
-
-  const generateTopics = async () => {
-    setIsGeneratingTopics(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/generate-topics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          domain: formData.domain,
-          workspaceName: formData.workspaceName,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to generate topics");
-      }
-
-      const data = await res.json();
-
-      // Set topics with first 5 pre-selected
-      setTopics(
-        (data.topics || []).map((t: TopicSuggestion, i: number) => ({
-          ...t,
-          selected: i < 5, // Pre-select first 5
-        }))
-      );
-      setHasGeneratedTopics(true);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to generate topics"
-      );
-    } finally {
-      setIsGeneratingTopics(false);
-    }
-  };
-
-  const handleComplete = useCallback(async () => {
+  const handleEmailSubmit = async () => {
+    if (!email.trim()) return;
     setIsLoading(true);
     setError(null);
 
     try {
-      // Create workspace, domain, and topics via API
-      const workspaceRes = await fetch("/api/workspaces", {
+      // First, check if the email already exists
+      const checkRes = await fetch("/api/auth/check-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.workspaceName,
-          domain: formData.domain,
-          topics: selectedTopics.map((t) => ({
-            name: t.name,
-            description: t.description,
-          })),
-        }),
+        body: JSON.stringify({ email }),
       });
 
-      if (!workspaceRes.ok) {
-        const data = await workspaceRes.json();
-        throw new Error(data.error || "Failed to create workspace");
+      if (!checkRes.ok) {
+        throw new Error("Failed to check email");
       }
 
-      // Redirect to the dashboard
-      router.push(`/dashboard`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const { exists } = await checkRes.json();
+
+      if (exists) {
+        // Email exists - show sign in form (slide from left)
+        goToStep("signin", "left");
+        setIsLoading(false);
+        return;
+      }
+
+      // Email doesn't exist - continue to company info (don't send OTP yet)
+      goToStep("company", "right");
+    } catch {
+      setError("Failed to continue. Please try again.");
+    } finally {
       setIsLoading(false);
     }
-  }, [formData, selectedTopics, router]);
+  };
 
-  const canProceed = useCallback(() => {
-    switch (currentStep) {
-      case "workspace":
-        return formData.workspaceName.trim().length > 0;
-      case "domain":
-        return formData.domain.trim().length > 0;
-      case "topics":
-        return selectedTopics.length > 0;
-      case "complete":
-        return true;
-      default:
-        return false;
-    }
-  }, [
-    currentStep,
-    formData.workspaceName,
-    formData.domain,
-    selectedTopics.length,
-  ]);
+  const handleSignIn = async () => {
+    if (!password) return;
+    setIsLoading(true);
+    setError(null);
 
-  // Handle Enter key to advance to next step
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey && canProceed()) {
-        e.preventDefault();
-        if (currentStep === "complete") {
-          handleComplete();
-        } else if (currentStep === "topics" && customTopic.trim()) {
-          // If typing custom topic, add it instead of advancing
-          addCustomTopic();
-        } else {
-          goNext();
-        }
+    try {
+      const result = await signIn.email({
+        email,
+        password,
+      });
+
+      if (result.error) {
+        setError(result.error.message || "Invalid email or password");
+        setIsLoading(false);
+        return;
       }
-    };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    currentStep,
-    canProceed,
-    goNext,
-    handleComplete,
-    customTopic,
-    addCustomTopic,
-  ]);
+      // Redirect to dashboard after successful sign in
+      router.push("/dashboard");
+    } catch {
+      setError("An unexpected error occurred");
+      setIsLoading(false);
+    }
+  };
+
+  const handleCompanySubmit = () => {
+    if (!companySize) return;
+
+    // Store company data for later use
+    localStorage.setItem("onboarding_company_size", companySize);
+    localStorage.setItem("onboarding_is_agency", isAgency.toString());
+
+    // Move to account creation step
+    goToStep("account", "right");
+  };
+
+  const handleAccountSubmit = async () => {
+    if (!firstName || !lastName || !password || !termsAccepted) return;
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Now send the verification OTP
+      console.log("[Onboarding] Sending verification OTP to:", email);
+      const result = await emailOtp.sendVerificationOtp({
+        email,
+        type: "sign-in",
+      });
+
+      console.log("[Onboarding] OTP send result:", result);
+
+      if (result.error) {
+        console.error("[Onboarding] OTP send error:", result.error);
+        setError(result.error.message || "Failed to send verification code");
+        setIsLoading(false);
+        return;
+      }
+
+      // Move to verification step
+      goToStep("verify", "right");
+      setResendTimer(60);
+      setCanResend(false);
+    } catch (err) {
+      console.error("[Onboarding] OTP send exception:", err);
+      setError("Failed to create account. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    // Only allow single digits
+    if (value.length > 1) {
+      value = value.slice(-1);
+    }
+
+    // Only allow numbers
+    if (value && !/^\d$/.test(value)) {
+      return;
+    }
+
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      otpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      // Move to previous input on backspace if current is empty
+      otpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, 6);
+    const newOtp = [...otp];
+    for (let i = 0; i < pastedData.length; i++) {
+      newOtp[i] = pastedData[i];
+    }
+    setOtp(newOtp);
+    // Focus the last filled input or the next empty one
+    const lastIndex = Math.min(pastedData.length, 5);
+    otpRefs.current[lastIndex]?.focus();
+  };
+
+  const handleVerify = useCallback(async () => {
+    const otpString = otp.join("");
+    if (otpString.length !== 6) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Sign in with OTP - this verifies the OTP and auto-creates user if needed
+      const result = await signIn.emailOtp({
+        email,
+        otp: otpString,
+      });
+
+      if (result.error) {
+        setError(result.error.message || "Invalid verification code");
+        setIsLoading(false);
+        return;
+      }
+
+      // Success - redirect to dashboard
+      router.push("/dashboard");
+    } catch {
+      setError("Failed to verify email");
+      setIsLoading(false);
+    }
+  }, [otp, email, router]);
+
+  const handleResend = async () => {
+    if (!canResend) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await emailOtp.sendVerificationOtp({
+        email,
+        type: "sign-in",
+      });
+
+      if (result.error) {
+        setError(result.error.message || "Failed to resend code");
+        setIsLoading(false);
+        return;
+      }
+
+      setResendTimer(60);
+      setCanResend(false);
+      setOtp(["", "", "", "", "", ""]);
+    } catch {
+      setError("Failed to resend code");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const goBack = () => {
+    setError(null);
+    if (currentStep === "signin") {
+      goToStep("email", "right");
+      setPassword("");
+    } else if (currentStep === "company") {
+      goToStep("email", "left");
+    } else if (currentStep === "account") {
+      goToStep("company", "left");
+    } else if (currentStep === "verify") {
+      goToStep("account", "left");
+    }
+  };
+
+  const isEmailValid = email.includes("@") && email.includes(".");
+  const isOtpComplete = otp.every((digit) => digit !== "");
+  const isAccountValid =
+    firstName.trim() &&
+    lastName.trim() &&
+    password.length >= 8 &&
+    termsAccepted;
+
+  // Animation variants
+  const slideVariants = {
+    enter: (dir: "left" | "right") => ({
+      x: dir === "right" ? 40 : -40,
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: (dir: "left" | "right") => ({
+      x: dir === "right" ? -40 : 40,
+      opacity: 0,
+    }),
+  };
 
   return (
     <div className="min-h-screen flex">
-      {/* Left Panel - Benefits */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#faf9f7] flex-col justify-between p-12 relative overflow-hidden">
-        {/* Logo */}
-        <div className="flex items-center gap-2">
-          <img src="/logo.svg" alt="GEO Analytics" className="w-6 h-6" />
-          <span className="font-semibold text-gray-900">GEO Analytics</span>
-        </div>
-
-        {/* Main Content */}
-        <div className="max-w-md">
-          <h1 className="text-4xl font-bold text-gray-900 leading-tight mb-4">
-            Get up to 14 days free
-          </h1>
-          <p className="text-gray-600 mb-10">
-            Start optimizing your content for AI search engines today.
-          </p>
-
-          <div className="space-y-5">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#6366f1] flex items-center justify-center mt-0.5">
-                <Check className="w-3 h-3 text-white" strokeWidth={3} />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900">
-                  Full feature access
-                </p>
-                <p className="text-gray-600 text-sm">
-                  All tools and analytics included
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#6366f1] flex items-center justify-center mt-0.5">
-                <Check className="w-3 h-3 text-white" strokeWidth={3} />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900">
-                  AI-powered optimization
-                </p>
-                <p className="text-gray-600 text-sm">
-                  Content effort scoring and insights
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#6366f1] flex items-center justify-center mt-0.5">
-                <Check className="w-3 h-3 text-white" strokeWidth={3} />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900">
-                  Try our starter plan
-                </p>
-                <p className="text-gray-600 text-sm">
-                  14 days of unlimited access
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Decorative Graph */}
-        <div className="relative">
-          <svg
-            viewBox="0 0 400 200"
-            className="w-full max-w-md opacity-60"
-            fill="none"
-          >
-            <defs>
-              <pattern
-                id="grid"
-                width="40"
-                height="40"
-                patternUnits="userSpaceOnUse"
-              >
-                <path
-                  d="M 40 0 L 0 0 0 40"
-                  fill="none"
-                  stroke="#e5e5e5"
-                  strokeWidth="1"
-                  strokeDasharray="2,4"
-                />
-              </pattern>
-            </defs>
-            <rect width="400" height="200" fill="url(#grid)" />
-            <path
-              d="M 0 180 Q 100 160 150 140 T 250 100 T 350 40 L 400 20"
-              stroke="#6366f1"
-              strokeWidth="3"
-              fill="none"
-              strokeLinecap="round"
-            />
-            <g transform="translate(240, 70)">
-              <rect
-                x="-50"
-                y="-20"
-                width="100"
-                height="40"
-                rx="8"
-                fill="#6366f1"
-              />
-              <text
-                x="0"
-                y="6"
-                textAnchor="middle"
-                fill="white"
-                fontSize="14"
-                fontWeight="600"
-              >
-                Visibility 28%
-              </text>
-            </g>
-          </svg>
-          <p className="text-xs text-gray-400 mt-4">
-            Join thousands optimizing for AI search
-          </p>
-        </div>
-      </div>
-
-      {/* Right Panel - Form */}
+      {/* Left Panel - Form */}
       <div className="flex-1 flex flex-col bg-white">
-        {/* Mobile Logo */}
-        <div className="lg:hidden flex items-center gap-2 p-6 border-b border-gray-100">
-          <img src="/logo.svg" alt="GEO Analytics" className="w-6 h-6" />
-          <span className="font-semibold text-gray-900">GEO Analytics</span>
-        </div>
+        <div className="flex-1 flex flex-col pt-12 lg:pt-16 px-8 lg:px-16 xl:px-24 max-w-xl mx-auto w-full">
+          {/* Logo */}
+          <div className="flex items-center gap-2 mb-12">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M12 2L2 7L12 12L22 7L12 2Z"
+                stroke="#171717"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M2 17L12 22L22 17"
+                stroke="#171717"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M2 12L12 17L22 12"
+                stroke="#171717"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="font-semibold text-gray-900">GEO Analytics</span>
+          </div>
 
-        {/* Form Content */}
-        <div className="flex-1 flex items-center justify-center p-8 lg:p-12">
-          <div className="w-full max-w-lg">
-            {/* Step Content */}
-            {currentStep === "workspace" && (
-              <div className="animate-in fade-in-0 slide-in-from-right-2">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-xl bg-[#faf9f7] flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-[#6366f1]" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Name your workspace
-                  </h2>
-                </div>
-                <p className="text-gray-600 mb-8 ml-13">
-                  This is usually your company or brand name
+          {/* Step Content */}
+          <AnimatePresence mode="wait" custom={direction}>
+            {currentStep === "email" && (
+              <motion.div
+                key="email"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              >
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                  What&apos;s your email?
+                </h1>
+                <p className="text-gray-500 mb-8">
+                  Create your account or sign in.
                 </p>
 
-                <input
-                  type="text"
-                  placeholder="e.g. Acme Inc"
-                  value={formData.workspaceName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, workspaceName: e.target.value })
-                  }
-                  autoFocus
-                  className="w-full px-4 py-4 text-lg rounded-lg border-b-2 border-gray-200 bg-transparent focus:outline-none focus:border-[#6366f1] transition-colors"
-                />
-              </div>
-            )}
-
-            {currentStep === "domain" && (
-              <div className="animate-in fade-in-0 slide-in-from-right-2">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-xl bg-[#faf9f7] flex items-center justify-center">
-                    <Globe className="w-5 h-5 text-[#6366f1]" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Which website do you want to track?
-                  </h2>
-                </div>
-                <p className="text-gray-600 mb-8">
-                  We&apos;ll use this to track your brand visibility, create
-                  content, and analyze your site
-                </p>
-
-                <input
-                  type="text"
-                  placeholder="e.g. example.com or example.com/en"
-                  value={formData.domain}
-                  onChange={(e) =>
-                    setFormData({ ...formData, domain: e.target.value })
-                  }
-                  autoFocus
-                  className="w-full px-4 py-4 text-lg rounded-lg border-b-2 border-gray-200 bg-transparent focus:outline-none focus:border-[#6366f1] transition-colors"
-                />
-                <p className="text-sm text-gray-400 mt-2">
-                  You can enter with or without https://
-                </p>
-              </div>
-            )}
-
-            {currentStep === "topics" && (
-              <div className="animate-in fade-in-0 slide-in-from-right-2">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-xl bg-[#faf9f7] flex items-center justify-center">
-                    <Hash className="w-5 h-5 text-[#6366f1]" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Which topics do you want to create prompts for?
-                  </h2>
-                </div>
-                <p className="text-gray-600 mb-2">Select up to 10 topics</p>
-                <div className="h-1 bg-gray-100 rounded-full mb-6 w-48">
-                  <div
-                    className="h-full bg-[#6366f1] rounded-full transition-all"
-                    style={{ width: `${(selectedTopics.length / 10) * 100}%` }}
-                  />
-                </div>
-
-                {!hasGeneratedTopics ? (
-                  <div className="text-center py-8">
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-gray-900">
+                    Work email
+                  </label>
+                  <div className="flex gap-3">
+                    <input
+                      type="email"
+                      placeholder="name@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && isEmailValid && !isLoading) {
+                          handleEmailSubmit();
+                        }
+                      }}
+                      autoFocus
+                      className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
+                    />
                     <button
-                      onClick={generateTopics}
-                      disabled={isGeneratingTopics}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
+                      onClick={handleEmailSubmit}
+                      disabled={!isEmailValid || isLoading}
+                      className="px-5 py-2.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
                     >
-                      {isGeneratingTopics ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Generating topics...
-                        </>
+                      {isLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          Generate Topics
-                        </>
+                        "Continue"
                       )}
                     </button>
-                    <p className="text-sm text-gray-500 mt-3">
-                      We&apos;ll suggest topics based on{" "}
-                      <strong>{formData.domain}</strong>
-                    </p>
                   </div>
-                ) : (
-                  <>
-                    {/* Topic Selection */}
-                    <div className="space-y-2 mb-4 max-h-[320px] overflow-y-auto pr-2">
-                      {topics.map((topic, index) => (
+
+                  {error && (
+                    <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                      {error}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {currentStep === "signin" && (
+              <motion.div
+                key="signin"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              >
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                  Welcome back!
+                </h1>
+                <p className="text-gray-500 mb-8">
+                  Please enter your account password to continue.
+                </p>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Work email
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      disabled
+                      className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-900">
+                        Password
+                      </label>
+                      <button
+                        type="button"
+                        className="text-sm text-gray-500 hover:text-gray-900 underline"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && password && !isLoading) {
+                            handleSignIn();
+                          }
+                        }}
+                        autoFocus
+                        className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-5 h-5" />
+                        ) : (
+                          <Eye className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleSignIn}
+                    disabled={!password || isLoading}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Signing in...
+                      </>
+                    ) : (
+                      "Sign in"
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {currentStep === "company" && (
+              <motion.div
+                key="company"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              >
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                  Tell us about your company
+                </h1>
+                <p className="text-gray-500 mb-8">
+                  This will help us personalize your experience.
+                </p>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-3">
+                      What&apos;s your company size?
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {COMPANY_SIZES.map((size) => (
                         <button
-                          key={index}
-                          onClick={() => toggleTopic(index)}
-                          disabled={!topic.selected && !canSelectMore}
-                          className={cn(
-                            "w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left",
-                            topic.selected
-                              ? "border-[#6366f1] bg-[#6366f1]/5"
-                              : "border-gray-200 hover:border-gray-300",
-                            !topic.selected &&
-                              !canSelectMore &&
-                              "opacity-50 cursor-not-allowed"
-                          )}
+                          key={size}
+                          onClick={() => setCompanySize(size)}
+                          className={`px-4 py-3 text-sm font-medium rounded-lg border transition-colors ${
+                            companySize === size
+                              ? "border-gray-900 bg-gray-900 text-white"
+                              : "border-gray-200 bg-white text-gray-900 hover:border-gray-300"
+                          } ${
+                            size === "1001+ employees"
+                              ? "col-span-2 sm:col-span-1"
+                              : ""
+                          }`}
                         >
-                          <div
-                            className={cn(
-                              "w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors",
-                              topic.selected
-                                ? "bg-[#6366f1]"
-                                : "border-2 border-gray-300"
-                            )}
-                          >
-                            {topic.selected && (
-                              <Check
-                                className="w-3 h-3 text-white"
-                                strokeWidth={3}
-                              />
-                            )}
-                          </div>
-                          <span className="text-sm font-medium text-gray-900">
-                            {topic.name}
-                          </span>
+                          {size}
                         </button>
                       ))}
                     </div>
-
-                    {/* Add Custom Topic */}
-                    <div className="flex items-center gap-2 mt-4">
-                      <div className="flex-1 relative">
-                        <Plus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                          type="text"
-                          placeholder="Add custom"
-                          value={customTopic}
-                          onChange={(e) => setCustomTopic(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              addCustomTopic();
-                            }
-                          }}
-                          disabled={!canSelectMore}
-                          className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:outline-none focus:border-[#6366f1] transition-colors disabled:opacity-50"
-                        />
-                      </div>
-                      {customTopic.trim() && (
-                        <button
-                          onClick={addCustomTopic}
-                          disabled={!canSelectMore}
-                          className="px-4 py-2.5 text-sm font-medium text-[#6366f1] hover:bg-[#6366f1]/10 rounded-xl transition-colors disabled:opacity-50"
-                        >
-                          Add
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Tips Card */}
-                    <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-                      <h4 className="font-medium text-gray-900 mb-2">
-                        Topic Selection Tips
-                      </h4>
-                      <ul className="space-y-2 text-sm text-gray-600">
-                        <li className="flex items-start gap-2">
-                          <Check className="w-4 h-4 text-[#6366f1] mt-0.5 flex-shrink-0" />
-                          <span>
-                            <strong>Each topic generates 5 prompts</strong> to
-                            track. We&apos;ll start you off with{" "}
-                            {selectedTopics.length} topics and{" "}
-                            {selectedTopics.length * 5} prompts. You can always
-                            add more later.
-                          </span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <Check className="w-4 h-4 text-[#6366f1] mt-0.5 flex-shrink-0" />
-                          <span>
-                            <strong>
-                              Try using keywords from traditional SEO
-                            </strong>
-                            . Pick common words or phrases that represent your
-                            brand.
-                          </span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <Check className="w-4 h-4 text-[#6366f1] mt-0.5 flex-shrink-0" />
-                          <span>
-                            <strong>Avoid long phrases</strong>. Remember these
-                            are topics not prompts.
-                          </span>
-                        </li>
-                      </ul>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {currentStep === "complete" && (
-              <div className="animate-in fade-in-0 slide-in-from-right-2 text-center">
-                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
-                  <Check className="w-8 h-8 text-green-600" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  You&apos;re all set!
-                </h2>
-                <p className="text-gray-600 mb-4">
-                  Your workspace <strong>{formData.workspaceName}</strong> is
-                  ready with {selectedTopics.length} topics and{" "}
-                  {selectedTopics.length * 5} prompts.
-                </p>
-                <p className="text-sm text-gray-500 mb-8">
-                  We&apos;ll start tracking <strong>{formData.domain}</strong>{" "}
-                  right away.
-                </p>
-
-                {error && (
-                  <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm mb-6">
-                    {error}
                   </div>
-                )}
 
-                <button
-                  onClick={handleComplete}
-                  disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Setting up your workspace...
-                    </>
-                  ) : (
-                    <>
-                      Go to Dashboard
-                      <ArrowRight className="w-4 h-4" />
-                    </>
+                  <div className="pt-2">
+                    <label className="block text-sm font-medium text-gray-900 mb-3">
+                      Are you an agency?
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={isAgency}
+                          onChange={(e) => setIsAgency(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-5 h-5 rounded-md border-2 border-gray-300 bg-white transition-all duration-200 peer-checked:bg-[#6366f1] peer-checked:border-[#6366f1] group-hover:border-gray-400 peer-checked:group-hover:border-[#4f46e5] peer-focus:ring-2 peer-focus:ring-[#6366f1]/20" />
+                        <svg
+                          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 pointer-events-none"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
+                      <span className="text-sm text-gray-700">
+                        Yes, I&apos;m an agency
+                      </span>
+                    </label>
+                  </div>
+
+                  {error && (
+                    <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                      {error}
+                    </div>
                   )}
-                </button>
-              </div>
+
+                  <button
+                    onClick={handleCompanySubmit}
+                    disabled={!companySize}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-900 font-medium rounded-lg transition-colors"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </motion.div>
             )}
-          </div>
+
+            {currentStep === "account" && (
+              <motion.div
+                key="account"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              >
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                  Create your account
+                </h1>
+                <p className="text-gray-500 mb-8">
+                  Sign up to start tracking your brand&apos;s visibility.
+                </p>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Work email
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      disabled
+                      className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        First name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="First name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        autoFocus
+                        className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        Last name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Last name"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-5 h-5" />
+                        ) : (
+                          <Eye className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1.5">
+                      Password must be at least 8 characters
+                    </p>
+                  </div>
+
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-5 h-5 rounded-md border-2 border-gray-300 bg-white transition-all duration-200 peer-checked:bg-[#6366f1] peer-checked:border-[#6366f1] group-hover:border-gray-400 peer-checked:group-hover:border-[#4f46e5] peer-focus:ring-2 peer-focus:ring-[#6366f1]/20" />
+                      <svg
+                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 pointer-events-none"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </div>
+                    <span className="text-sm text-gray-700">
+                      I agree to the{" "}
+                      <a
+                        href="/terms"
+                        className="text-gray-900 underline hover:text-gray-700"
+                      >
+                        terms and conditions
+                      </a>
+                      .
+                    </span>
+                  </label>
+
+                  {error && (
+                    <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleAccountSubmit}
+                    disabled={!isAccountValid || isLoading}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-900 font-medium rounded-lg transition-colors"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Creating account...
+                      </>
+                    ) : (
+                      "Create account"
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {currentStep === "verify" && (
+              <motion.div
+                key="verify"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              >
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                  Verify your email
+                </h1>
+                <p className="text-gray-500 mb-8">We sent it to {email}.</p>
+
+                <div className="space-y-6">
+                  {/* OTP Input */}
+                  <div>
+                    <div className="grid grid-cols-6 gap-3">
+                      {otp.map((digit, index) => (
+                        <input
+                          key={index}
+                          ref={(el) => {
+                            otpRefs.current[index] = el;
+                          }}
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={1}
+                          value={digit}
+                          onChange={(e) =>
+                            handleOtpChange(index, e.target.value)
+                          }
+                          onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                          onPaste={index === 0 ? handleOtpPaste : undefined}
+                          autoFocus={index === 0}
+                          className="w-full h-20 text-center text-3xl font-semibold rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
+                        />
+                      ))}
+                    </div>
+                    {error && (
+                      <p className="text-red-500 text-sm mt-2">{error}</p>
+                    )}
+                  </div>
+
+                  {/* Open Email & Resend */}
+                  <div className="flex items-center justify-between">
+                    <a
+                      href="https://mail.google.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Open Email
+                      <ArrowUpRight className="w-4 h-4" />
+                    </a>
+                    <div className="flex items-center gap-2 text-sm">
+                      {!canResend && (
+                        <span className="text-gray-400">
+                          Resend in {formatTime(resendTimer)}
+                        </span>
+                      )}
+                      <button
+                        onClick={handleResend}
+                        disabled={!canResend || isLoading}
+                        className={`font-medium transition-colors ${
+                          canResend
+                            ? "text-gray-900 hover:text-gray-700"
+                            : "text-gray-300 cursor-not-allowed"
+                        }`}
+                      >
+                        Resend
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleVerify}
+                    disabled={!isOtpComplete || isLoading}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-900 font-medium rounded-lg transition-colors"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      "Verify"
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Footer Navigation */}
-        <div className="border-t border-gray-100 p-6">
-          {/* Progress Bar */}
-          <div className="h-1 bg-gray-100 rounded-full mb-6 overflow-hidden">
-            <div
-              className="h-full bg-[#6366f1] transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
+        {currentStep !== "email" && currentStep !== "signin" && (
+          <div className="px-8 lg:px-16 xl:px-24 py-6 max-w-xl mx-auto w-full flex items-center justify-between">
             <button
               onClick={goBack}
-              disabled={currentStepIndex === 0}
-              className={cn(
-                "flex items-center gap-2 text-sm font-medium transition-colors",
-                currentStepIndex === 0
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-600 hover:text-gray-900"
-              )}
+              className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               Back
             </button>
 
-            {currentStep !== "complete" && (
-              <button
-                onClick={goNext}
-                disabled={!canProceed()}
-                className={cn(
-                  "flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-colors",
-                  canProceed()
-                    ? "bg-[#6366f1] hover:bg-[#4f46e5] text-white"
-                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                )}
+            {/* Progress dots */}
+            <div className="flex items-center gap-1.5">
+              {["email", "company", "account", "verify"].map((step, index) => {
+                const stepOrder = ["email", "company", "account", "verify"];
+                const currentIndex = stepOrder.indexOf(currentStep);
+                const isActive = index <= currentIndex;
+                const isCurrent = step === currentStep;
+                return (
+                  <div
+                    key={step}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      isCurrent
+                        ? "w-6 bg-gray-900"
+                        : isActive
+                        ? "w-2 bg-gray-900"
+                        : "w-2 bg-gray-300"
+                    }`}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {currentStep === "signin" && (
+          <div className="px-8 lg:px-16 xl:px-24 py-6 max-w-xl mx-auto w-full">
+            <button
+              onClick={goBack}
+              className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Right Panel - Decorative */}
+      <div className="hidden lg:block lg:w-[45%] bg-[#f5f5f5] relative overflow-hidden">
+        {/* Decorative dot pattern */}
+        <div className="absolute inset-0 opacity-30">
+          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern
+                id="dots"
+                x="0"
+                y="0"
+                width="20"
+                height="20"
+                patternUnits="userSpaceOnUse"
               >
-                {currentStep === "topics" ? "Looks good" : "Continue"}
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            )}
+                <circle cx="2" cy="2" r="1" fill="#9ca3af" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#dots)" />
+          </svg>
+        </div>
+
+        {/* Testimonial Card Placeholder */}
+        <div className="absolute bottom-20 right-8 left-8 bg-white rounded-2xl shadow-lg p-6 max-w-md ml-auto">
+          <p className="text-gray-900 mb-4">
+            &quot;After trying out a few AI SEO platforms, I hounded the team at
+            GEO Analytics for a license until they finally took the call. Since
+            then, our visibility has 4x&apos;d and it&apos;s a common occurrence
+            for a customer to tell me they found us via ChatGPT or
+            Perplexity.&quot;
+          </p>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gray-200" />
+            <div>
+              <p className="font-medium text-gray-900 text-sm">Customer Name</p>
+              <p className="text-gray-500 text-sm">CEO and Co-Founder</p>
+            </div>
           </div>
         </div>
       </div>

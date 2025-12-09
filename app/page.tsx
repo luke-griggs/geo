@@ -25,13 +25,13 @@ export default function LandingPage() {
 
         <div className="flex items-center gap-3">
           <Link
-            href="/sign-in"
+            href="/onboarding"
             className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
           >
             Sign in
           </Link>
           <Link
-            href="/sign-up"
+            href="/onboarding"
             className="px-4 py-2 text-sm font-medium text-white bg-[#6366f1] hover:bg-[#4f46e5] rounded-lg transition-colors"
           >
             Get started
@@ -58,21 +58,21 @@ export default function LandingPage() {
 
         {/* Subheadline */}
         <p className="text-xl text-gray-500 text-center max-w-2xl mx-auto mb-10">
-          Monitor your visibility across ChatGPT, Claude, Perplexity, and other AI
-          search engines. Get insights to improve how AI recommends you.
+          Monitor your visibility across ChatGPT, Claude, Perplexity, and other
+          AI search engines. Get insights to improve how AI recommends you.
         </p>
 
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
-            href="/sign-up"
+            href="/onboarding"
             className="inline-flex items-center gap-2 px-6 py-3 text-base font-medium text-white bg-[#6366f1] hover:bg-[#4f46e5] rounded-lg transition-colors"
           >
             Start free trial
             <ArrowRight className="w-4 h-4" />
           </Link>
           <Link
-            href="/sign-in"
+            href="/onboarding"
             className="inline-flex items-center px-6 py-3 text-base font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors"
           >
             View demo
@@ -132,16 +132,30 @@ export default function LandingPage() {
               {/* Chart placeholder */}
               <div className="bg-white rounded-xl p-4 border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm font-medium text-gray-900">Visibility Over Time</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    Visibility Over Time
+                  </p>
                   <div className="flex gap-2">
-                    <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">7D</span>
-                    <span className="px-2 py-1 text-xs bg-[#6366f1] text-white rounded">30D</span>
-                    <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">90D</span>
+                    <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                      7D
+                    </span>
+                    <span className="px-2 py-1 text-xs bg-[#6366f1] text-white rounded">
+                      30D
+                    </span>
+                    <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                      90D
+                    </span>
                   </div>
                 </div>
                 <svg viewBox="0 0 400 100" className="w-full h-24">
                   <defs>
-                    <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <linearGradient
+                      id="chartGradient"
+                      x1="0%"
+                      y1="0%"
+                      x2="0%"
+                      y2="100%"
+                    >
                       <stop offset="0%" stopColor="#6366f1" stopOpacity="0.2" />
                       <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
                     </linearGradient>
@@ -166,7 +180,9 @@ export default function LandingPage() {
 
         {/* Trust indicators */}
         <div className="mt-16 text-center">
-          <p className="text-sm text-gray-400 mb-6">Monitoring visibility across</p>
+          <p className="text-sm text-gray-400 mb-6">
+            Monitoring visibility across
+          </p>
           <div className="flex items-center justify-center gap-8 opacity-60">
             <div className="flex items-center gap-2 text-gray-600">
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
@@ -201,13 +217,20 @@ export default function LandingPage() {
       <footer className="border-t border-gray-100 py-8">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-gray-400">
-            &copy; {new Date().getFullYear()} GEO Analytics. All rights reserved.
+            &copy; {new Date().getFullYear()} GEO Analytics. All rights
+            reserved.
           </p>
           <div className="flex items-center gap-6">
-            <a href="#" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+            <a
+              href="#"
+              className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            >
               Privacy
             </a>
-            <a href="#" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+            <a
+              href="#"
+              className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            >
               Terms
             </a>
           </div>

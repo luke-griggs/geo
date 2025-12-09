@@ -28,3 +28,4 @@ END $$;
 CREATE INDEX IF NOT EXISTS "topic_domainId_idx" ON "topic" USING btree ("domain_id");
 CREATE INDEX IF NOT EXISTS "topic_name_idx" ON "topic" USING btree ("name");
 CREATE INDEX IF NOT EXISTS "prompt_topicId_idx" ON "prompt" USING btree ("topic_id");
+

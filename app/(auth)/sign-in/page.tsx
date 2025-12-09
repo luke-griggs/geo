@@ -46,12 +46,12 @@ export default function SignInPage() {
     <div className="min-h-screen bg-[#faf9f7] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
+        <div className="flex items-center justify-center gap-2 mb-8 animate-in-initial animate-in slide-in-from-left-4">
           <img src="/logo.svg" alt="GEO Analytics" className="w-6 h-6" />
         </div>
 
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 animate-in-initial animate-in slide-in-from-left-4 animation-delay-75">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Welcome back
           </h1>
@@ -68,7 +68,7 @@ export default function SignInPage() {
             </div>
           )}
 
-          <div>
+          <div className="animate-in-initial animate-in slide-in-from-left-4 animation-delay-150">
             <input
               type="email"
               placeholder="Email address"
@@ -81,7 +81,7 @@ export default function SignInPage() {
             />
           </div>
 
-          <div className="relative">
+          <div className="relative animate-in-initial animate-in slide-in-from-left-4 animation-delay-225">
             <input
               type={showPassword ? "text" : "password"}
               placeholder="Password"
@@ -108,7 +108,7 @@ export default function SignInPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors animate-in-initial animate-in slide-in-from-left-4 animation-delay-300"
           >
             {isLoading ? (
               <>
@@ -122,10 +122,10 @@ export default function SignInPage() {
         </form>
 
         {/* Sign up link */}
-        <p className="text-center mt-6 text-gray-600">
+        <p className="text-center mt-6 text-gray-600 animate-in-initial animate-in slide-in-from-left-4 animation-delay-375">
           Don&apos;t have an account?{" "}
           <Link
-            href="/sign-up"
+            href="/onboarding"
             className="text-[#6366f1] hover:text-[#4f46e5] font-medium"
           >
             Create one
