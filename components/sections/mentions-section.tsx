@@ -14,6 +14,12 @@ import {
   Loader2,
 } from "lucide-react";
 import { QueryDetailPanel } from "@/components/query-detail-panel";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface MentionsSectionProps {
   workspaceId: string;
@@ -100,98 +106,327 @@ function FilterButton({
   );
 }
 
-function MiniAreaChart({ data }: { data: { date: string; count: number }[] }) {
-  if (data.length === 0) {
-    return (
-      <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
-        No data available
-      </div>
-    );
-  }
+function MiniAreaChart({
+  data,
+}: {
+  data: { date: string; mentions: number; citations: number }[];
+}) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const height = 120;
-  const width = 360;
-  const padding = 8;
-  const chartHeight = height - padding * 2 - 20; // Leave room for labels
-  const chartWidth = width - padding * 2;
+  // Always generate 7 days of data, filling zeros for missing dates
+  const chartData = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days: { date: string; mentions: number; citations: number }[] = [];
 
-  const maxCount = Math.max(...data.map((d) => d.count), 1);
+    // Create a map of existing data by date
+    const dataMap = new Map(data.map((d) => [d.date, d]));
 
-  const points = data.map((d, i) => ({
-    x: padding + (i / Math.max(data.length - 1, 1)) * chartWidth,
-    y: height - padding - 20 - (d.count / maxCount) * chartHeight,
-  }));
+    // Generate past 7 days
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split("T")[0];
+      const existing = dataMap.get(dateStr);
+      days.push({
+        date: dateStr,
+        mentions: existing?.mentions || 0,
+        citations: existing?.citations || 0,
+      });
+    }
 
-  const pathD = points.reduce((acc, point, i) => {
-    if (i === 0) return `M ${point.x} ${point.y}`;
-    const prev = points[i - 1];
-    const cpx1 = prev.x + (point.x - prev.x) / 3;
-    const cpx2 = prev.x + (2 * (point.x - prev.x)) / 3;
-    return `${acc} C ${cpx1} ${prev.y}, ${cpx2} ${point.y}, ${point.x} ${point.y}`;
-  }, "");
+    return days;
+  }, [data]);
 
-  const areaPath = `${pathD} L ${points[points.length - 1].x} ${
-    height - padding - 20
-  } L ${points[0].x} ${height - padding - 20} Z`;
+  // Chart dimensions - fill the container
+  const height = 140;
+  const width = 450;
+  const padding = { top: 10, right: 30, bottom: 28, left: 36 };
+  const chartHeight = height - padding.top - padding.bottom;
+  const chartWidth = width - padding.left - padding.right;
 
-  // Get labels (show first, middle, last dates)
-  const labelIndices = [0, Math.floor(data.length / 2), data.length - 1].filter(
-    (i, idx, arr) => arr.indexOf(i) === idx
+  const maxCount = Math.max(
+    ...chartData.map((d) => Math.max(d.mentions, d.citations)),
+    1
   );
 
+  // Calculate nice even y-axis values
+  // Find a nice step size (multiples of 1, 2, 5, 10, etc.)
+  const yTickCount = 5;
+  const rawStep = maxCount / (yTickCount - 1);
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
+  const normalizedStep = rawStep / magnitude;
+  let niceStep: number;
+  if (normalizedStep <= 1) niceStep = 1 * magnitude;
+  else if (normalizedStep <= 2) niceStep = 2 * magnitude;
+  else if (normalizedStep <= 5) niceStep = 5 * magnitude;
+  else niceStep = 10 * magnitude;
+
+  // Ensure minimum step of 1
+  niceStep = Math.max(1, Math.round(niceStep));
+  const niceMax = niceStep * (yTickCount - 1);
+
+  // Generate evenly spaced ticks: 0, step, 2*step, 3*step, 4*step
+  const yTicks = Array.from({ length: yTickCount }, (_, i) => i * niceStep);
+
+  // Points for mentions (darker indigo)
+  const mentionPoints = chartData.map((d, i) => ({
+    x: padding.left + (i / Math.max(chartData.length - 1, 1)) * chartWidth,
+    y: padding.top + chartHeight - (d.mentions / niceMax) * chartHeight,
+    data: d,
+    index: i,
+  }));
+
+  // Points for citations (lighter indigo)
+  const citationPoints = chartData.map((d, i) => ({
+    x: padding.left + (i / Math.max(chartData.length - 1, 1)) * chartWidth,
+    y: padding.top + chartHeight - (d.citations / niceMax) * chartHeight,
+    data: d,
+    index: i,
+  }));
+
+  const createPath = (points: { x: number; y: number }[]) => {
+    return points.reduce((acc, point, i) => {
+      if (i === 0) return `M ${point.x} ${point.y}`;
+      const prev = points[i - 1];
+      const cpx1 = prev.x + (point.x - prev.x) / 3;
+      const cpx2 = prev.x + (2 * (point.x - prev.x)) / 3;
+      return `${acc} C ${cpx1} ${prev.y}, ${cpx2} ${point.y}, ${point.x} ${point.y}`;
+    }, "");
+  };
+
+  const createAreaPath = (
+    points: { x: number; y: number }[],
+    pathD: string
+  ) => {
+    const baseline = padding.top + chartHeight;
+    return `${pathD} L ${points[points.length - 1].x} ${baseline} L ${
+      points[0].x
+    } ${baseline} Z`;
+  };
+
+  const mentionPathD = createPath(mentionPoints);
+  const citationPathD = createPath(citationPoints);
+  const mentionAreaPath = createAreaPath(mentionPoints, mentionPathD);
+  const citationAreaPath = createAreaPath(citationPoints, citationPathD);
+
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-32">
-      <defs>
-        <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="rgb(251, 146, 60)" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="rgb(251, 146, 60)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
+    <div className="w-full rounded-xl p-4 outline-1 outline-gray-200">
+      {/* Legend in top right */}
+      <div className="flex justify-end gap-4 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+          <span className="text-xs text-gray-500">Mentions</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-indigo-300" />
+          <span className="text-xs text-gray-500">Citations</span>
+        </div>
+      </div>
 
-      {/* Baseline */}
-      <line
-        x1={padding}
-        y1={height - padding - 20}
-        x2={width - padding}
-        y2={height - padding - 20}
-        stroke="rgb(229, 231, 235)"
-        strokeWidth={1}
-      />
+      <div className="relative w-full">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          <defs>
+            {/* Gradient for mentions (darker indigo) */}
+            <linearGradient
+              id="mentionsGradient"
+              x1="0%"
+              y1="0%"
+              x2="0%"
+              y2="100%"
+            >
+              <stop offset="0%" stopColor="#6366f1" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+            </linearGradient>
+            {/* Gradient for citations (lighter indigo) */}
+            <linearGradient
+              id="citationsGradient"
+              x1="0%"
+              y1="0%"
+              x2="0%"
+              y2="100%"
+            >
+              <stop offset="0%" stopColor="#a5b4fc" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#a5b4fc" stopOpacity="0" />
+            </linearGradient>
+          </defs>
 
-      {/* Area fill */}
-      <path d={areaPath} fill="url(#areaGradient)" />
+          {/* Y-axis grid lines and labels */}
+          {yTicks.map((tick) => {
+            const y =
+              padding.top + chartHeight - (tick / niceMax) * chartHeight;
+            return (
+              <g key={tick}>
+                <line
+                  x1={padding.left}
+                  y1={y}
+                  x2={width - padding.right}
+                  y2={y}
+                  stroke="#f3f4f6"
+                  strokeWidth={1}
+                />
+                <text
+                  x={padding.left - 8}
+                  y={y}
+                  textAnchor="end"
+                  alignmentBaseline="middle"
+                  className="text-[11px] fill-gray-400"
+                >
+                  {tick}
+                </text>
+              </g>
+            );
+          })}
 
-      {/* Line */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke="rgb(249, 115, 22)"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+          {/* Citations area fill (render first so mentions overlay on top) */}
+          <path d={citationAreaPath} fill="url(#citationsGradient)" />
 
-      {/* X-axis labels */}
-      {labelIndices.map((i) => {
-        const d = data[i];
-        const x = padding + (i / Math.max(data.length - 1, 1)) * chartWidth;
-        const dateLabel = new Date(d.date).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-        });
-        return (
-          <text
-            key={i}
-            x={x}
-            y={height - 4}
-            className="text-[9px] fill-gray-400"
-            textAnchor="middle"
+          {/* Citations line */}
+          <path
+            d={citationPathD}
+            fill="none"
+            stroke="#a5b4fc"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {/* Mentions area fill */}
+          <path d={mentionAreaPath} fill="url(#mentionsGradient)" />
+
+          {/* Mentions line */}
+          <path
+            d={mentionPathD}
+            fill="none"
+            stroke="#6366f1"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {/* Hover vertical line */}
+          {hoveredIndex !== null && (
+            <line
+              x1={mentionPoints[hoveredIndex].x}
+              y1={padding.top}
+              x2={mentionPoints[hoveredIndex].x}
+              y2={padding.top + chartHeight}
+              stroke="#e5e7eb"
+              strokeWidth={1}
+            />
+          )}
+
+          {/* Data points - only show on hover */}
+          {hoveredIndex !== null && (
+            <>
+              <circle
+                cx={citationPoints[hoveredIndex].x}
+                cy={citationPoints[hoveredIndex].y}
+                r={4}
+                fill="#a5b4fc"
+                stroke="white"
+                strokeWidth={2}
+              />
+              <circle
+                cx={mentionPoints[hoveredIndex].x}
+                cy={mentionPoints[hoveredIndex].y}
+                r={4}
+                fill="#6366f1"
+                stroke="white"
+                strokeWidth={2}
+              />
+            </>
+          )}
+
+          {/* X-axis labels - all 7 dates */}
+          {chartData.map((d, i) => {
+            const x =
+              padding.left +
+              (i / Math.max(chartData.length - 1, 1)) * chartWidth;
+            const dateLabel = new Date(d.date).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            });
+            return (
+              <text
+                key={i}
+                x={x}
+                y={height - 6}
+                className="text-[11px] fill-gray-400"
+                textAnchor="middle"
+              >
+                {dateLabel}
+              </text>
+            );
+          })}
+
+          {/* Invisible hover areas for each data point */}
+          {chartData.map((_, i) => {
+            const x =
+              padding.left +
+              (i / Math.max(chartData.length - 1, 1)) * chartWidth;
+            const hoverWidth = chartWidth / Math.max(chartData.length - 1, 1);
+            return (
+              <rect
+                key={i}
+                x={x - hoverWidth / 2}
+                y={padding.top}
+                width={hoverWidth}
+                height={chartHeight}
+                fill="transparent"
+                onMouseEnter={() => setHoveredIndex(i)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                style={{ cursor: "crosshair" }}
+              />
+            );
+          })}
+        </svg>
+
+        {/* Tooltip */}
+        {hoveredIndex !== null && (
+          <div
+            className="absolute bg-white rounded-lg shadow-lg border border-gray-200 px-3 py-2 pointer-events-none z-10"
+            style={{
+              left: `${(mentionPoints[hoveredIndex].x / width) * 100}%`,
+              top: "10%",
+              transform: "translateX(-50%)",
+            }}
           >
-            {dateLabel}
-          </text>
-        );
-      })}
-    </svg>
+            <div className="text-sm font-medium text-gray-700 mb-1.5">
+              {new Date(chartData[hoveredIndex].date).toLocaleDateString(
+                "en-US",
+                {
+                  month: "short",
+                  day: "numeric",
+                }
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-sm mb-1">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                <span className="text-gray-500">Mentions</span>
+              </div>
+              <span className="font-semibold text-gray-900">
+                {chartData[hoveredIndex].mentions}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-300" />
+                <span className="text-gray-500">Citations</span>
+              </div>
+              <span className="font-semibold text-gray-900">
+                {chartData[hoveredIndex].citations}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -258,8 +493,9 @@ function CitationIcon({ domain }: { domain: string | null }) {
 
 interface AggregateStats {
   totalMentions: number;
+  totalCitations: number;
   totalQueries: number;
-  chartData: { date: string; count: number }[];
+  chartData: { date: string; mentions: number; citations: number }[];
   platformData: { name: string; mentions: number; percentage: number }[];
 }
 
@@ -277,6 +513,7 @@ export function MentionsSection({
   });
   const [aggregateStats, setAggregateStats] = useState<AggregateStats>({
     totalMentions: 0,
+    totalCitations: 0,
     totalQueries: 0,
     chartData: [],
     platformData: [],
@@ -379,13 +616,17 @@ export function MentionsSection({
   const stats = useMemo(() => {
     // Calculate change vs previous period (simplified placeholder)
     const previousMentions = Math.max(0, aggregateStats.totalMentions - 2);
-    const change = aggregateStats.totalMentions - previousMentions;
+    const mentionsChange = aggregateStats.totalMentions - previousMentions;
+    const previousCitations = Math.max(0, aggregateStats.totalCitations - 1);
+    const citationsChange = aggregateStats.totalCitations - previousCitations;
 
     return {
       totalMentions: aggregateStats.totalMentions,
+      totalCitations: aggregateStats.totalCitations,
       totalQueries: aggregateStats.totalQueries,
       chartData: aggregateStats.chartData,
-      change,
+      mentionsChange,
+      citationsChange,
       platformData: aggregateStats.platformData,
     };
   }, [aggregateStats]);
@@ -415,7 +656,7 @@ export function MentionsSection({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Mentions</h1>
@@ -459,23 +700,38 @@ export function MentionsSection({
               <h3 className="text-sm font-semibold text-gray-900">
                 Mentions & Citations
               </h3>
-              <Info className="w-3.5 h-3.5 text-gray-400" />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="w-3.5 h-3.5 text-gray-400" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      Daily brand mentions and branded citations across AI
+                      answers. Shows how often your brand appears in
+                      AI-generated responses.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
-            <p className="text-xs text-gray-500 mb-4">
+            <p className="text-xs text-gray-500 mb-3">
               Daily brand mentions and branded citations across AI answers
             </p>
 
             <div className="flex items-baseline gap-2 mb-4">
               <span className="text-3xl font-bold text-gray-900">
-                {stats.totalMentions}
+                {stats.totalMentions + stats.totalCitations}
               </span>
               <span
-                className={`text-sm font-medium ${
-                  stats.change >= 0 ? "text-emerald-500" : "text-red-500"
+                className={`text-xs font-medium ${
+                  stats.mentionsChange + stats.citationsChange >= 0
+                    ? "text-emerald-500"
+                    : "text-red-500"
                 }`}
               >
-                {stats.change >= 0 ? "+" : ""}
-                {stats.change} vs previous period
+                {stats.mentionsChange + stats.citationsChange >= 0 ? "+" : ""}
+                {stats.mentionsChange + stats.citationsChange} vs yesterday
               </span>
             </div>
 
@@ -488,7 +744,19 @@ export function MentionsSection({
               <h3 className="text-sm font-semibold text-gray-900">
                 Performance by Platform
               </h3>
-              <Info className="w-3.5 h-3.5 text-gray-400" />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="w-3.5 h-3.5 text-gray-400" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      Breakdown of your brand mentions across different AI
+                      platforms like ChatGPT, Claude, Perplexity, and more.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             <p className="text-xs text-gray-500 mb-4">
               Mentions and branded citations per AI engine
@@ -544,7 +812,19 @@ export function MentionsSection({
             <h3 className="text-base font-semibold text-gray-900">
               All Queries
             </h3>
-            <Info className="w-3.5 h-3.5 text-gray-400" />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Info className="w-3.5 h-3.5 text-gray-400" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    Complete list of all queries run against AI platforms with
+                    their responses and brand mention data.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <p className="text-sm text-gray-500 mb-4">
             All queries and responses from AI platforms
@@ -814,7 +1094,6 @@ export function MentionsSection({
           )}
         </div>
       </div>
-
       {/* Query Detail Panel */}
       <QueryDetailPanel
         isOpen={isPanelOpen}

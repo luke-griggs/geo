@@ -154,7 +154,7 @@ export function YourMentions({
     <div className="p-5 bg-white border border-gray-200 rounded-xl">
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-gray-900">Your Mentions</h3>
+          <h3 className="text-base font-medium text-gray-900">Your Mentions</h3>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger>
@@ -198,7 +198,6 @@ export function YourMentions({
               <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-100">
                 <th className="pb-3 pr-4">
                   <div className="flex items-center gap-1">
-                    <span className="text-gray-400">💬</span>
                     Prompt
                     <TooltipProvider>
                       <Tooltip>
@@ -214,7 +213,6 @@ export function YourMentions({
                 </th>
                 <th className="pb-3 px-4 text-center">
                   <div className="flex items-center justify-center gap-1">
-                    <span className="text-gray-400">🤖</span>
                     Model
                     <TooltipProvider>
                       <Tooltip>

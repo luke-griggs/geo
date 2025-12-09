@@ -1,6 +1,13 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface RankingItem {
   rank: number;
@@ -26,15 +33,23 @@ export function IndustryRanking({
       <div className="flex items-center justify-between mb-4">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-medium text-gray-600">
+            <h3 className="text-base font-medium text-gray-900">
               Industry Ranking
             </h3>
-            <div
-              className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center text-[10px] text-gray-400 cursor-help"
-              title="Brands with highest visibility in AI responses"
-            >
-              ?
-            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Info className="w-3.5 h-3.5 text-gray-400" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    Brands ranked by how often they appear in AI responses. Your
+                    position shows how you compare to competitors across AI
+                    platforms.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <p className="text-xs text-gray-500 mt-0.5">
             Brands with highest visibility
@@ -42,16 +57,16 @@ export function IndustryRanking({
         </div>
       </div>
 
-      <div className="text-3xl font-bold text-gray-900 mb-6">
+      <div className="text-3xl font-bold text-gray-900 mb-4">
         {userVisibility.toFixed(1)}%
       </div>
 
       {data.length === 0 ? (
-        <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
+        <div className="h-[150px] flex items-center justify-center text-gray-400 text-sm">
           No brand data available
         </div>
       ) : (
-        <div className="max-h-[340px] overflow-y-auto">
+        <div className="max-h-[240px] overflow-y-auto">
           <table className="w-full text-sm table-fixed">
             <colgroup>
               <col className="w-[8%]" />
@@ -72,25 +87,72 @@ export function IndustryRanking({
                 <th className="text-right py-2 px-2 text-xs font-medium text-gray-500">
                   <div className="flex items-center justify-end gap-1">
                     MENTIONS
-                    <span className="text-gray-400 text-[10px]">?</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="w-3 h-3 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            Total number of times this brand was mentioned in AI
+                            responses.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </th>
                 <th className="text-right py-2 px-2 text-xs font-medium text-gray-500">
                   <div className="flex items-center justify-end gap-1">
                     POSITION
-                    <span className="text-gray-400 text-[10px]">?</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="w-3 h-3 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            Average position when mentioned in AI responses.
+                            Lower is better.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </th>
                 <th className="text-right py-2 px-2 text-xs font-medium text-gray-500">
                   <div className="flex items-center justify-end gap-1">
                     CHANGE
-                    <span className="text-gray-400 text-[10px]">?</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="w-3 h-3 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            Change in visibility compared to the previous time
+                            period.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </th>
                 <th className="text-right py-2 px-2 text-xs font-medium text-gray-500">
                   <div className="flex items-center justify-end gap-1">
                     VISIBILITY
-                    <span className="text-gray-400 text-[10px]">?</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="w-3 h-3 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            Percentage of AI responses that mention this brand.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </th>
               </tr>

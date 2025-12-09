@@ -208,7 +208,7 @@ export function AIModelPerformance({
     <div className="p-5 bg-white border border-gray-200 rounded-xl">
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-gray-900">
+          <h3 className="text-base font-medium text-gray-900">
             AI Model Performance
           </h3>
           <TooltipProvider>
@@ -268,8 +268,8 @@ export function AIModelPerformance({
           <table className="w-full">
             <thead>
               <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                <th className="pb-3 pr-4">
-                  <div className="flex items-center gap-1">
+                <th className="pb-3 pr-4 text-right">
+                  <div className="flex items-center justify-end gap-1">
                     Rank
                     <TooltipProvider>
                       <Tooltip>
@@ -353,7 +353,7 @@ export function AIModelPerformance({
                   key={stat.model}
                   className="hover:bg-gray-50/50 transition-colors"
                 >
-                  <td className="py-3 pr-4">
+                  <td className="py-3 pr-4 text-right">
                     <span className="text-sm font-medium text-gray-500">
                       #{index + 1}
                     </span>

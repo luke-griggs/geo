@@ -136,20 +136,79 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const totalPages = Math.ceil(total / limit);
 
     // Calculate aggregate stats from ALL runs (before pagination)
+    // Count citations that reference the user's domain (branded citations)
+    // Not ALL citations from web search, only ones that cite the user's website
+    const userDomainName = domainRecord.domain
+      .toLowerCase()
+      .replace("www.", "");
+
+    const totalCitations = runs.reduce((acc, r) => {
+      const citations = r.citations as
+        | Array<{ url: string; title: string; snippet?: string }>
+        | null
+        | undefined;
+      if (!citations) return acc;
+
+      // Only count citations that reference the user's domain
+      const brandedCitations = citations.filter((c) => {
+        try {
+          if (!c.url) return false;
+          const citationDomain = new URL(c.url).hostname
+            .toLowerCase()
+            .replace("www.", "");
+          return (
+            citationDomain === userDomainName ||
+            citationDomain.endsWith(`.${userDomainName}`)
+          );
+        } catch {
+          return false;
+        }
+      });
+      return acc + brandedCitations.length;
+    }, 0);
+
     const aggregateStats = {
       totalMentions: runs.filter((r) => mentionByRunId.get(r.id)?.mentioned)
         .length,
+      totalCitations,
       totalQueries: runs.length,
-      // Group by date for chart
+      // Group by date for chart - track both mentions and branded citations
       chartData: Object.entries(
         runs.reduce((acc, r) => {
           const date = r.executedAt.toISOString().split("T")[0];
-          if (!acc[date]) acc[date] = 0;
-          if (mentionByRunId.get(r.id)?.mentioned) acc[date]++;
+          if (!acc[date]) acc[date] = { mentions: 0, citations: 0 };
+          if (mentionByRunId.get(r.id)?.mentioned) acc[date].mentions++;
+
+          // Only count citations that reference the user's domain
+          const citations = r.citations as
+            | Array<{ url: string; title: string; snippet?: string }>
+            | null
+            | undefined;
+          if (citations) {
+            const brandedCitations = citations.filter((c) => {
+              try {
+                if (!c.url) return false;
+                const citationDomain = new URL(c.url).hostname
+                  .toLowerCase()
+                  .replace("www.", "");
+                return (
+                  citationDomain === userDomainName ||
+                  citationDomain.endsWith(`.${userDomainName}`)
+                );
+              } catch {
+                return false;
+              }
+            });
+            acc[date].citations += brandedCitations.length;
+          }
           return acc;
-        }, {} as Record<string, number>)
+        }, {} as Record<string, { mentions: number; citations: number }>)
       )
-        .map(([date, count]) => ({ date, count }))
+        .map(([date, data]) => ({
+          date,
+          mentions: data.mentions,
+          citations: data.citations,
+        }))
         .sort((a, b) => a.date.localeCompare(b.date)),
       // Platform breakdown
       platformData: Object.entries(

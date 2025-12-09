@@ -49,21 +49,6 @@ interface PromptsSectionProps {
   domainName: string;
 }
 
-function ScoreCircle({ score }: { score: number }) {
-  const hasScore = score > 0;
-  return (
-    <div
-      className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
-        hasScore
-          ? "bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-700 ring-2 ring-emerald-400/50"
-          : "bg-gray-100 text-gray-400"
-      }`}
-    >
-      {score}
-    </div>
-  );
-}
-
 function StatusDot({ status }: { status: "active" | "warning" | "inactive" }) {
   const colors = {
     active: "bg-emerald-500",
@@ -76,8 +61,8 @@ function StatusDot({ status }: { status: "active" | "warning" | "inactive" }) {
 function RunningDot() {
   return (
     <span className="relative flex h-2 w-2">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-      <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#6366f1] opacity-75"></span>
+      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#6366f1]"></span>
     </span>
   );
 }
@@ -206,7 +191,7 @@ function CreatePromptModal({
                 onChange={(e) => setPromptText(e.target.value)}
                 placeholder="e.g., What are the best tools for digital badge issuance?"
                 rows={4}
-                className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:bg-white transition-all placeholder:text-gray-400 resize-none"
+                className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] focus:bg-white transition-all placeholder:text-gray-400 resize-none"
                 autoFocus
               />
               <p className="mt-2 text-xs text-gray-500">
@@ -230,7 +215,7 @@ function CreatePromptModal({
             <button
               type="submit"
               disabled={!promptText.trim() || isSubmitting}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
             >
               {isSubmitting ? (
                 <>
@@ -268,6 +253,22 @@ export function PromptsSection({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [selectedPromptIds, setSelectedPromptIds] = useState<Set<string>>(
+    new Set()
+  );
+
+  // Selection handler for individual prompts
+  const togglePromptSelection = (promptId: string) => {
+    setSelectedPromptIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(promptId)) {
+        next.delete(promptId);
+      } else {
+        next.add(promptId);
+      }
+      return next;
+    });
+  };
 
   // Fetch prompts
   const fetchPrompts = useCallback(async () => {
@@ -352,25 +353,20 @@ export function PromptsSection({
     }
   };
 
-  // Calculate score based on latest run's mention analysis
-  const getPromptScore = (prompt: Prompt): number => {
-    if (prompt.runs.length === 0) return 0;
+  // Get average position from latest run's mention analysis
+  const getAveragePosition = (prompt: Prompt): number | null => {
+    if (prompt.runs.length === 0) return null;
     const latestRun = prompt.runs[0];
     if (!latestRun.mentionAnalyses || latestRun.mentionAnalyses.length === 0)
-      return 0;
+      return null;
 
     // Check if mentioned in the latest run
-    const mentioned = latestRun.mentionAnalyses.some((m) => m.mentioned);
-    if (!mentioned) return 0;
-
-    // Get the position (lower is better)
-    const position = latestRun.mentionAnalyses.find(
+    const mentionedAnalysis = latestRun.mentionAnalyses.find(
       (m) => m.mentioned
-    )?.position;
-    if (!position) return 50;
+    );
+    if (!mentionedAnalysis || !mentionedAnalysis.position) return null;
 
-    // Score based on position: 1st = 100, 2nd = 90, etc.
-    return Math.max(0, 110 - position * 10);
+    return mentionedAnalysis.position;
   };
 
   // Get status based on latest run
@@ -388,6 +384,20 @@ export function PromptsSection({
   const filteredPrompts = prompts.filter((p) =>
     p.promptText.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Selection state helpers (must be after filteredPrompts)
+  const toggleSelectAll = () => {
+    if (selectedPromptIds.size === filteredPrompts.length) {
+      setSelectedPromptIds(new Set());
+    } else {
+      setSelectedPromptIds(new Set(filteredPrompts.map((p) => p.id)));
+    }
+  };
+
+  const isAllSelected =
+    filteredPrompts.length > 0 &&
+    selectedPromptIds.size === filteredPrompts.length;
+  const isSomeSelected = selectedPromptIds.size > 0;
 
   if (isLoading) {
     return (
@@ -431,194 +441,278 @@ export function PromptsSection({
         </p>
       </div>
 
-      {/* Header bar */}
-      <div className="flex items-center justify-between gap-4 pb-4">
-        {/* Left side - Search and filter */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search prompts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-56 pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-300 focus:bg-white transition-all placeholder:text-gray-400"
-            />
-          </div>
-          <button className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            Active
-            <ChevronDown className="h-4 w-4 text-gray-400" />
-          </button>
-        </div>
-
-        {/* Right side - Actions */}
-        <div className="flex items-center gap-3">
-          <button className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
-            <Plus className="h-4 w-4" />
-            New Article
-          </button>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-          >
-            <Plus className="h-4 w-4" />
-            Create prompts
-          </button>
-        </div>
-      </div>
-
-      {/* Domain indicator */}
-      <div className="flex items-center gap-2 pb-3 text-sm text-gray-500">
-        <span>Tracking:</span>
-        <span className="font-medium text-gray-900">{domainName}</span>
-      </div>
-
-      {/* Table header info */}
-      <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-        <input
-          type="checkbox"
-          className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900/10"
-        />
-        <span className="text-sm text-gray-500">
-          Prompts ({filteredPrompts.length})
-        </span>
-        <button className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
-          ↑↓
-        </button>
-        <button className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors">
-          <svg
-            className="w-3.5 h-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-            />
-          </svg>
-        </button>
-        <button className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-500 border border-gray-200 rounded hover:bg-gray-50 transition-colors">
-          All tracked
-          <ChevronDown className="h-3 w-3" />
-        </button>
-
-        {/* Right side headers */}
-        <div className="ml-auto flex items-center">
-          <div className="w-28 text-xs font-medium text-gray-500 text-center">
-            Top Brands
-          </div>
-          <div className="w-24 text-xs font-medium text-gray-500 text-center">
-            Last Run
-          </div>
-          <div className="w-16 text-xs font-medium text-gray-500 text-center">
-            Actions
-          </div>
-        </div>
-      </div>
-
-      {/* Table rows */}
-      <div className="flex-1 overflow-auto">
-        {filteredPrompts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-              <Search className="h-7 w-7 text-gray-400" />
+      {/* Main container with border */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col flex-1">
+        {/* Gray toolbar bar */}
+        <div className="flex items-center justify-between gap-4 px-4 py-3 bg-gray-50 border-b border-gray-200">
+          {/* Left side - Search and filter */}
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search prompts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-56 pl-9 pr-4 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-300 transition-all placeholder:text-gray-400"
+              />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">
-              No prompts yet
-            </h3>
-            <p className="text-sm text-gray-500 mb-4 max-w-sm">
-              Create your first prompt to start tracking how AI assistants
-              mention your brand.
-            </p>
+            <button className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              Active
+              <ChevronDown className="h-4 w-4 text-gray-400" />
+            </button>
+            {/* Archive button - shows when items are selected */}
+            {isSomeSelected && (
+              <button className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                Archive
+              </button>
+            )}
+          </div>
+
+          {/* Right side - Actions */}
+          <div className="flex items-center gap-3">
+            {/* New Article button - shows when items are selected */}
+            {isSomeSelected && (
+              <button className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
+                <Plus className="h-4 w-4" />
+                New Article
+              </button>
+            )}
             <button
               onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
             >
               <Plus className="h-4 w-4" />
-              Create your first prompt
+              Create prompts
             </button>
           </div>
-        ) : (
-          filteredPrompts.map((prompt, index) => {
-            const isRunning = runningPromptIds.has(prompt.id);
-            const score = getPromptScore(prompt);
-            const status = getPromptStatus(prompt);
-            const lastRun = prompt.runs[0];
-            const brandMentions = lastRun?.brandMentions || [];
+        </div>
 
-            const handleRowClick = () => {
-              setSelectedPrompt(prompt);
-              setIsPanelOpen(true);
-            };
-
-            return (
-              <div
-                key={prompt.id}
-                className="flex items-center gap-3 py-2.5 border-b border-gray-50 hover:bg-gray-50/50 transition-colors group"
-              >
-                {/* Clickable area for navigation */}
-                <div
-                  onClick={handleRowClick}
-                  className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+        {/* Table header info */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+          {/* Checkbox container - same w-6 as row checkboxes */}
+          <div className="w-6 flex items-center justify-center">
+            <button
+              onClick={toggleSelectAll}
+              className="w-[18px] h-[18px] rounded-[4px] flex items-center justify-center transition-all duration-150"
+              style={{
+                backgroundColor: isAllSelected ? "#6366f1" : "transparent",
+                border: isAllSelected ? "none" : "1.5px solid #d1d5db",
+              }}
+            >
+              {isAllSelected && (
+                <svg
+                  className="w-3 h-3 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={3}
                 >
-                  {/* Row number */}
-                  <span className="w-6 text-sm text-gray-400 text-center">
-                    {index + 1}
-                  </span>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
+          <span className="text-sm text-gray-500">
+            Prompts ({filteredPrompts.length})
+          </span>
+          <button className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+            ↑↓
+          </button>
+          <button className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors">
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+              />
+            </svg>
+          </button>
+          <button className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-500 border border-gray-200 rounded hover:bg-gray-50 transition-colors">
+            All tracked
+            <ChevronDown className="h-3 w-3" />
+          </button>
 
-                  {/* Score */}
-                  <ScoreCircle score={score} />
+          {/* Right side headers */}
+          <div className="ml-auto flex items-center gap-4">
+            <div className="w-20 text-xs font-medium text-gray-500 text-center">
+              Avg Position
+            </div>
+            <div className="w-32 text-xs font-medium text-gray-500 text-center">
+              Top Brands
+            </div>
+            <div className="w-24 text-xs font-medium text-gray-500 text-center">
+              Last Run
+            </div>
+            <div className="w-16 text-xs font-medium text-gray-500 text-center">
+              Actions
+            </div>
+          </div>
+        </div>
 
-                  {/* Prompt text */}
-                  <div className="flex-1 flex items-center gap-2 min-w-0">
+        {/* Table rows */}
+        <div className="flex-1 overflow-auto px-4">
+          {filteredPrompts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                <Search className="h-7 w-7 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-1">
+                No prompts yet
+              </h3>
+              <p className="text-sm text-gray-500 mb-4 max-w-sm">
+                Create your first prompt to start tracking how AI assistants
+                mention your brand.
+              </p>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              >
+                <Plus className="h-4 w-4" />
+                Create your first prompt
+              </button>
+            </div>
+          ) : (
+            filteredPrompts.map((prompt, index) => {
+              const isRunning = runningPromptIds.has(prompt.id);
+              const status = getPromptStatus(prompt);
+              const lastRun = prompt.runs[0];
+              const brandMentions = lastRun?.brandMentions || [];
+              const avgPosition = getAveragePosition(prompt);
+              const isSelected = selectedPromptIds.has(prompt.id);
+
+              const handleRowClick = () => {
+                setSelectedPrompt(prompt);
+                setIsPanelOpen(true);
+              };
+
+              const handleCheckboxClick = (e: React.MouseEvent) => {
+                e.stopPropagation();
+                togglePromptSelection(prompt.id);
+              };
+
+              return (
+                <div
+                  key={prompt.id}
+                  className="flex items-center gap-3 py-2.5 border-b border-gray-50 hover:bg-gray-50/50 transition-colors group"
+                >
+                  {/* Row number / Checkbox */}
+                  <div
+                    onClick={handleCheckboxClick}
+                    className="w-6 h-6 flex items-center justify-center cursor-pointer relative"
+                  >
+                    {/* Row number - hidden on hover or when selected */}
+                    <span
+                      className={`text-sm text-gray-400 text-center absolute transition-opacity duration-150 ${
+                        isSelected ? "opacity-0" : "group-hover:opacity-0"
+                      }`}
+                    >
+                      {index + 1}
+                    </span>
+                    {/* Checkbox - shown on hover or when selected */}
+                    <div
+                      className={`w-[18px] h-[18px] rounded-[4px] flex items-center justify-center transition-all duration-150 absolute ${
+                        isSelected
+                          ? "opacity-100"
+                          : "opacity-0 group-hover:opacity-100"
+                      }`}
+                      style={{
+                        backgroundColor: isSelected ? "#6366f1" : "transparent",
+                        border: isSelected ? "none" : "1.5px solid #d1d5db",
+                      }}
+                    >
+                      {isSelected && (
+                        <svg
+                          className="w-3 h-3 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Clickable area for navigation - prompt text only */}
+                  <div
+                    onClick={handleRowClick}
+                    className="flex-1 flex items-center gap-2 min-w-0 cursor-pointer"
+                  >
                     <span className="text-sm text-gray-900 truncate hover:underline">
                       {prompt.promptText}
                     </span>
                     {isRunning ? <RunningDot /> : <StatusDot status={status} />}
                   </div>
 
-                  {/* Top Brands */}
-                  <div className="w-28 flex items-center justify-center">
-                    <TopBrands brands={brandMentions} />
-                  </div>
+                  {/* Right side columns - matching header layout */}
+                  <div className="flex items-center gap-4">
+                    {/* Avg Position */}
+                    <div className="w-20 flex items-center justify-center">
+                      {avgPosition ? (
+                        <span className="text-xs text-gray-700 font-medium">
+                          {avgPosition}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </div>
 
-                  {/* Last Run */}
-                  <div className="w-24 flex items-center justify-center">
-                    {lastRun ? (
-                      <span className="text-xs text-gray-500">
-                        {new Date(lastRun.executedAt).toLocaleDateString()}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-300">Never</span>
-                    )}
+                    {/* Top Brands */}
+                    <div className="w-32 flex items-center justify-center">
+                      <TopBrands brands={brandMentions} />
+                    </div>
+
+                    {/* Last Run */}
+                    <div className="w-24 flex items-center justify-center">
+                      {lastRun ? (
+                        <span className="text-xs text-gray-500">
+                          {new Date(lastRun.executedAt).toLocaleDateString()}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">Never</span>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="w-16 flex items-center justify-center">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRunPrompt(prompt.id);
+                        }}
+                        disabled={isRunning}
+                        className="p-1.5 text-gray-400 hover:text-[#6366f1] hover:bg-[#6366f1]/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Run prompt"
+                      >
+                        {isRunning ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                {/* Actions - separate from clickable area */}
-                <div className="w-16 flex items-center justify-center">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRunPrompt(prompt.id);
-                    }}
-                    disabled={isRunning}
-                    className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Run prompt"
-                  >
-                    {isRunning ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        )}
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Create Prompt Modal */}

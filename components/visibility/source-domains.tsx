@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, HelpCircle } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SourceDomainsProps {
   workspaceId: string;
@@ -213,18 +219,24 @@ export function SourceDomainsSection({
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 relative">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-2">
-        <h3 className="text-lg font-semibold text-gray-900">Source Domains</h3>
-        <div
-          className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center cursor-help"
-          title="Top citation domains referenced across all queries. Quickly see which sources are most influential."
-        >
-          <HelpCircle className="h-3 w-3 text-gray-400" />
-        </div>
+      <div className="flex items-center gap-2">
+        <h3 className="text-base font-medium text-gray-900">Source Domains</h3>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <Info className="w-3.5 h-3.5 text-gray-400" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                Top citation domains referenced across all AI responses. Shows
+                which sources are most frequently cited alongside your brand.
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
-      <p className="text-sm text-gray-500 mb-6">
-        Top citation domains referenced across all queries. Quickly see which
-        sources are most influential and how they tend to link to your brand.
+      <p className="text-xs text-gray-500 mt-0.5 mb-4">
+        Top citation domains referenced across all queries
       </p>
 
       {!data?.sourceDomains.length ? (

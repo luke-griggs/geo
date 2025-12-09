@@ -156,7 +156,7 @@ function DashboardContent() {
 
       {/* Main content */}
       <main className="flex-1 ml-64 transition-[margin] duration-200">
-        <div className="p-8 h-screen overflow-auto">
+        <div className="p-8 pb-16 h-screen overflow-auto">
           {activeSection === "prompts" && (
             <PromptsSection
               workspaceId={workspace.id}

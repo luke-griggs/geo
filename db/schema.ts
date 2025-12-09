@@ -266,6 +266,7 @@ export const dailyMetrics = pgTable(
     avgPosition: decimal("avg_position", { precision: 4, scale: 2 }),
     totalPrompts: integer("total_prompts").default(0),
     totalMentions: integer("total_mentions").default(0),
+    totalCitations: integer("total_citations").default(0),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

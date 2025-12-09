@@ -177,7 +177,7 @@ export function VisibilitySection({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col pb-12">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Visibility</h1>
