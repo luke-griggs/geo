@@ -6,7 +6,6 @@ import {
   PanelLeft,
   PanelRight,
   FileText,
-  Database,
   User,
   LogOut,
   ChevronUp,
@@ -31,13 +30,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSession, signOut } from "@/lib/auth-client";
 import { AccountSettingsModal } from "@/components/account-settings-modal";
 
-type NavSection = "prompts" | "visibility" | "mentions" | "sources";
+type NavSection = "prompts" | "visibility" | "mentions";
 
 const navItems = [
   { id: "visibility" as const, label: "Visibility", icon: Eye },
-  { id: "prompts" as const, label: "Prompts", icon: FileText },
   { id: "mentions" as const, label: "Mentions", icon: AtSign },
-  { id: "sources" as const, label: "Sources", icon: Database },
+  { id: "prompts" as const, label: "Prompts", icon: FileText },
 ];
 
 function getInitials(name?: string | null) {

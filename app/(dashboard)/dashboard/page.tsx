@@ -6,7 +6,6 @@ import { Sidebar, type NavSection } from "@/components/sidebar";
 import { PromptsSection } from "@/components/sections/prompts-section";
 import { VisibilitySection } from "@/components/sections/visibility-section";
 import { MentionsSection } from "@/components/sections/mentions-section";
-import { SourcesSection } from "@/components/sections/sources-section";
 import { Loader2 } from "lucide-react";
 
 interface Workspace {
@@ -30,8 +29,7 @@ function DashboardContent() {
   const [error, setError] = useState<string | null>(null);
 
   const activeSection: NavSection =
-    sectionParam &&
-    ["prompts", "visibility", "mentions", "sources"].includes(sectionParam)
+    sectionParam && ["prompts", "visibility", "mentions"].includes(sectionParam)
       ? (sectionParam as NavSection)
       : "prompts";
 
@@ -145,7 +143,6 @@ function DashboardContent() {
               domainName={domain.domain}
             />
           )}
-          {activeSection === "sources" && <SourcesSection />}
         </div>
       </main>
     </div>
