@@ -89,7 +89,7 @@ export default function SignUpPage() {
                   setFormData({ ...formData, firstName: e.target.value })
                 }
                 required
-                className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#c9644a]/20 focus:border-[#c9644a] transition-colors"
+                className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
               />
             </div>
             <div>
@@ -101,7 +101,7 @@ export default function SignUpPage() {
                   setFormData({ ...formData, lastName: e.target.value })
                 }
                 required
-                className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#c9644a]/20 focus:border-[#c9644a] transition-colors"
+                className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
               />
             </div>
           </div>
@@ -115,22 +115,32 @@ export default function SignUpPage() {
                 setFormData({ ...formData, email: e.target.value })
               }
               required
-              className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#c9644a]/20 focus:border-[#c9644a] transition-colors"
+              className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
             />
           </div>
 
           <div className="flex gap-4">
-            <div className={`relative transition-all duration-300 ease-out ${formData.password ? 'w-1/2' : 'w-full'}`}>
+            <div
+              className={`relative transition-all duration-300 ease-out ${
+                formData.password ? "w-1/2" : "w-full"
+              }`}
+            >
               <input
                 type={showPassword ? "text" : "password"}
                 placeholder="Password (min. 8 characters)"
                 value={formData.password}
                 onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value, confirmPassword: e.target.value ? formData.confirmPassword : "" })
+                  setFormData({
+                    ...formData,
+                    password: e.target.value,
+                    confirmPassword: e.target.value
+                      ? formData.confirmPassword
+                      : "",
+                  })
                 }
                 required
                 minLength={8}
-                className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#c9644a]/20 focus:border-[#c9644a] transition-colors"
+                className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
               />
               <button
                 type="button"
@@ -144,11 +154,9 @@ export default function SignUpPage() {
                 )}
               </button>
             </div>
-            <div 
+            <div
               className={`relative transition-all duration-300 ease-out overflow-hidden ${
-                formData.password 
-                  ? 'w-1/2 opacity-100' 
-                  : 'w-0 opacity-0'
+                formData.password ? "w-1/2 opacity-100" : "w-0 opacity-0"
               }`}
             >
               <input
@@ -161,7 +169,7 @@ export default function SignUpPage() {
                 required={!!formData.password}
                 minLength={8}
                 tabIndex={formData.password ? 0 : -1}
-                className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#c9644a]/20 focus:border-[#c9644a] transition-colors min-w-[200px]"
+                className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors min-w-[200px]"
               />
               <button
                 type="button"
@@ -181,7 +189,7 @@ export default function SignUpPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#c9644a] hover:bg-[#b55840] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
           >
             {isLoading ? (
               <>
@@ -211,7 +219,7 @@ export default function SignUpPage() {
           Already have an account?{" "}
           <Link
             href="/sign-in"
-            className="text-[#c9644a] hover:text-[#b55840] font-medium"
+            className="text-[#6366f1] hover:text-[#4f46e5] font-medium"
           >
             Sign in
           </Link>
@@ -220,4 +228,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-

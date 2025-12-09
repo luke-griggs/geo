@@ -24,7 +24,7 @@ interface SourceDomainsData {
 
 // Colors for the donut chart segments
 const CHART_COLORS = [
-  "#c9644a", // primary brown/terracotta
+  "#6366f1", // primary indigo
   "#e8a87c", // light peach
   "#6b7280", // gray
   "#10b981", // green

@@ -73,6 +73,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       string,
       {
         name: string;
+        domain: string | null;
         mentionCount: number;
         firstSeen: Date;
         lastSeen: Date;
@@ -88,6 +89,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       if (!brandAggregates[key]) {
         brandAggregates[key] = {
           name: bm.brandName,
+          domain: bm.brandDomain,
           mentionCount: 0,
           firstSeen: run.executedAt,
           lastSeen: run.executedAt,
@@ -95,6 +97,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
 
       brandAggregates[key].mentionCount++;
+
+      // Keep the most recent domain if we have one
+      if (bm.brandDomain && !brandAggregates[key].domain) {
+        brandAggregates[key].domain = bm.brandDomain;
+      }
 
       if (run.executedAt < brandAggregates[key].firstSeen) {
         brandAggregates[key].firstSeen = run.executedAt;
@@ -108,6 +115,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const brands = Object.values(brandAggregates)
       .map((brand) => ({
         name: brand.name,
+        domain: brand.domain,
         mentionCount: brand.mentionCount,
         firstSeen: brand.firstSeen.toISOString(),
         lastSeen: brand.lastSeen.toISOString(),
@@ -123,5 +131,3 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     );
   }
 }
-
-

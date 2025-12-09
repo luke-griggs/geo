@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Sidebar, type NavSection } from "@/components/sidebar";
+import { Sidebar, type NavSection, type Domain } from "@/components/sidebar";
 import { PromptsSection } from "@/components/sections/prompts-section";
 import { VisibilitySection } from "@/components/sections/visibility-section";
 import { MentionsSection } from "@/components/sections/mentions-section";
@@ -12,19 +12,17 @@ interface Workspace {
   id: string;
   name: string;
   slug: string;
-  domains: Array<{
-    id: string;
-    domain: string;
-    name: string | null;
-  }>;
+  domains: Domain[];
 }
 
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sectionParam = searchParams.get("section");
+  const domainParam = searchParams.get("domain");
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +37,25 @@ function DashboardContent() {
     router.push(`/dashboard?${params.toString()}`);
   };
 
+  const handleDomainChange = (domainId: string) => {
+    setSelectedDomainId(domainId);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("domain", domainId);
+    router.push(`/dashboard?${params.toString()}`);
+  };
+
+  const handleDomainAdded = (newDomain: Domain) => {
+    if (workspace) {
+      // Add new domain to the list
+      setWorkspace({
+        ...workspace,
+        domains: [newDomain, ...workspace.domains],
+      });
+      // Select the newly added domain
+      handleDomainChange(newDomain.id);
+    }
+  };
+
   // Fetch user's workspace and domain on mount
   useEffect(() => {
     async function fetchWorkspace() {
@@ -51,7 +68,18 @@ function DashboardContent() {
 
         // Use the first workspace (most recent)
         if (data.workspaces && data.workspaces.length > 0) {
-          setWorkspace(data.workspaces[0]);
+          const ws = data.workspaces[0];
+          setWorkspace(ws);
+
+          // Set selected domain from URL param or default to first domain
+          if (ws.domains.length > 0) {
+            const domainFromUrl = ws.domains.find(
+              (d: Domain) => d.id === domainParam
+            );
+            setSelectedDomainId(
+              domainFromUrl ? domainFromUrl.id : ws.domains[0].id
+            );
+          }
         } else {
           // No workspace found, redirect to onboarding
           router.push("/onboarding");
@@ -64,7 +92,7 @@ function DashboardContent() {
     }
 
     fetchWorkspace();
-  }, [router]);
+  }, [router, domainParam]);
 
   if (isLoading) {
     return (
@@ -109,14 +137,21 @@ function DashboardContent() {
     );
   }
 
-  // Use the first domain of the workspace
-  const domain = workspace.domains[0];
+  // Get the selected domain or fall back to first
+  const domain =
+    workspace.domains.find((d) => d.id === selectedDomainId) ||
+    workspace.domains[0];
 
   return (
     <div className="flex min-h-screen bg-white">
       <Sidebar
         activeSection={activeSection}
         onSectionChange={handleSectionChange}
+        workspaceId={workspace.id}
+        domains={workspace.domains}
+        selectedDomainId={domain.id}
+        onDomainChange={handleDomainChange}
+        onDomainAdded={handleDomainAdded}
       />
 
       {/* Main content */}

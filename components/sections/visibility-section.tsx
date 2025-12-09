@@ -6,7 +6,6 @@ import {
   FilterBar,
   TimePeriod,
   Platform,
-  CompetitorType,
 } from "@/components/visibility/filter-bar";
 import { VisibilityChart } from "@/components/visibility/visibility-chart";
 import { IndustryRanking } from "@/components/visibility/industry-ranking";
@@ -37,6 +36,7 @@ interface RankingItem {
 
 interface Brand {
   name: string;
+  domain: string | null;
   mentionCount: number;
 }
 
@@ -57,7 +57,6 @@ export function VisibilitySection({
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("7d");
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
-  const [competitorType, setCompetitorType] = useState<CompetitorType>("serp");
 
   // Data state
   const [visibilityData, setVisibilityData] = useState<VisibilityData | null>(
@@ -198,8 +197,6 @@ export function VisibilitySection({
           selectedBrands={selectedBrands}
           onBrandsChange={setSelectedBrands}
           availableBrands={availableBrands}
-          competitorType={competitorType}
-          onCompetitorTypeChange={setCompetitorType}
         />
 
         {/* Main Content Grid */}

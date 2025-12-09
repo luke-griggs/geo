@@ -52,7 +52,9 @@ export default function SignInPage() {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome back
+          </h1>
           <p className="text-gray-600">
             Sign in to continue to your dashboard.
           </p>
@@ -75,7 +77,7 @@ export default function SignInPage() {
                 setFormData({ ...formData, email: e.target.value })
               }
               required
-              className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#c9644a]/20 focus:border-[#c9644a] transition-colors"
+              className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
             />
           </div>
 
@@ -88,7 +90,7 @@ export default function SignInPage() {
                 setFormData({ ...formData, password: e.target.value })
               }
               required
-              className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#c9644a]/20 focus:border-[#c9644a] transition-colors"
+              className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
             />
             <button
               type="button"
@@ -106,7 +108,7 @@ export default function SignInPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#c9644a] hover:bg-[#b55840] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
           >
             {isLoading ? (
               <>
@@ -124,7 +126,7 @@ export default function SignInPage() {
           Don&apos;t have an account?{" "}
           <Link
             href="/sign-up"
-            className="text-[#c9644a] hover:text-[#b55840] font-medium"
+            className="text-[#6366f1] hover:text-[#4f46e5] font-medium"
           >
             Create one
           </Link>
@@ -133,4 +135,3 @@ export default function SignInPage() {
     </div>
   );
 }
-

@@ -113,13 +113,13 @@ export function IndustryRanking({
                       <span
                         className={cn(
                           "font-medium truncate",
-                          item.isUserDomain ? "text-[#c9644a]" : "text-gray-900"
+                          item.isUserDomain ? "text-[#6366f1]" : "text-gray-900"
                         )}
                       >
                         {item.brand}
                       </span>
                       {item.isUserDomain && (
-                        <span className="text-[10px] bg-[#c9644a]/10 text-[#c9644a] px-1.5 py-0.5 rounded font-medium shrink-0">
+                        <span className="text-[10px] bg-[#6366f1]/10 text-[#6366f1] px-1.5 py-0.5 rounded font-medium shrink-0">
                           YOU
                         </span>
                       )}

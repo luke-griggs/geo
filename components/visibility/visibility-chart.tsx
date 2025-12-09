@@ -175,7 +175,7 @@ export function VisibilityChart({ data, currentScore }: VisibilityChartProps) {
               <path
                 d={pathD}
                 fill="none"
-                stroke="#c9644a"
+                stroke="#6366f1"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -189,7 +189,7 @@ export function VisibilityChart({ data, currentScore }: VisibilityChartProps) {
                 cx={point.x}
                 cy={point.y}
                 r="3"
-                fill="#c9644a"
+                fill="#6366f1"
                 stroke="white"
                 strokeWidth="1.5"
               />
@@ -198,8 +198,8 @@ export function VisibilityChart({ data, currentScore }: VisibilityChartProps) {
             {/* Gradient definition */}
             <defs>
               <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#c9644a" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#c9644a" stopOpacity="0" />
+                <stop offset="0%" stopColor="#6366f1" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
               </linearGradient>
             </defs>
           </svg>
@@ -213,5 +213,3 @@ function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
-
-

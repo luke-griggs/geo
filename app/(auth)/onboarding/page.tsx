@@ -123,7 +123,7 @@ export default function OnboardingPage() {
 
           <div className="space-y-5">
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#c9644a] flex items-center justify-center mt-0.5">
+              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#6366f1] flex items-center justify-center mt-0.5">
                 <Check className="w-3 h-3 text-white" strokeWidth={3} />
               </div>
               <div>
@@ -137,7 +137,7 @@ export default function OnboardingPage() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#c9644a] flex items-center justify-center mt-0.5">
+              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#6366f1] flex items-center justify-center mt-0.5">
                 <Check className="w-3 h-3 text-white" strokeWidth={3} />
               </div>
               <div>
@@ -151,7 +151,7 @@ export default function OnboardingPage() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#c9644a] flex items-center justify-center mt-0.5">
+              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#6366f1] flex items-center justify-center mt-0.5">
                 <Check className="w-3 h-3 text-white" strokeWidth={3} />
               </div>
               <div>
@@ -192,7 +192,7 @@ export default function OnboardingPage() {
             <rect width="400" height="200" fill="url(#grid)" />
             <path
               d="M 0 180 Q 100 160 150 140 T 250 100 T 350 40 L 400 20"
-              stroke="#c9644a"
+              stroke="#6366f1"
               strokeWidth="3"
               fill="none"
               strokeLinecap="round"
@@ -204,7 +204,7 @@ export default function OnboardingPage() {
                 width="100"
                 height="40"
                 rx="8"
-                fill="#c9644a"
+                fill="#6366f1"
               />
               <text
                 x="0"
@@ -240,7 +240,7 @@ export default function OnboardingPage() {
               <div className="animate-in fade-in-0 slide-in-from-right-2">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 rounded-xl bg-[#faf9f7] flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-[#c9644a]" />
+                    <Building2 className="w-5 h-5 text-[#6366f1]" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900">
                     Name your workspace
@@ -258,7 +258,7 @@ export default function OnboardingPage() {
                     setFormData({ ...formData, workspaceName: e.target.value })
                   }
                   autoFocus
-                  className="w-full px-4 py-4 text-lg rounded-lg border-b-2 border-gray-200 bg-transparent focus:outline-none focus:border-[#c9644a] transition-colors"
+                  className="w-full px-4 py-4 text-lg rounded-lg border-b-2 border-gray-200 bg-transparent focus:outline-none focus:border-[#6366f1] transition-colors"
                 />
               </div>
             )}
@@ -267,7 +267,7 @@ export default function OnboardingPage() {
               <div className="animate-in fade-in-0 slide-in-from-right-2">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 rounded-xl bg-[#faf9f7] flex items-center justify-center">
-                    <Globe className="w-5 h-5 text-[#c9644a]" />
+                    <Globe className="w-5 h-5 text-[#6366f1]" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900">
                     Which website do you want to track?
@@ -286,7 +286,7 @@ export default function OnboardingPage() {
                     setFormData({ ...formData, domain: e.target.value })
                   }
                   autoFocus
-                  className="w-full px-4 py-4 text-lg rounded-lg border-b-2 border-gray-200 bg-transparent focus:outline-none focus:border-[#c9644a] transition-colors"
+                  className="w-full px-4 py-4 text-lg rounded-lg border-b-2 border-gray-200 bg-transparent focus:outline-none focus:border-[#6366f1] transition-colors"
                 />
                 <p className="text-sm text-gray-400 mt-2">
                   You can enter with or without https://
@@ -317,7 +317,7 @@ export default function OnboardingPage() {
                 <button
                   onClick={handleComplete}
                   disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#c9644a] hover:bg-[#b55840] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
                 >
                   {isLoading ? (
                     <>
@@ -341,7 +341,7 @@ export default function OnboardingPage() {
           {/* Progress Bar */}
           <div className="h-1 bg-gray-100 rounded-full mb-6 overflow-hidden">
             <div
-              className="h-full bg-[#c9644a] transition-all duration-300"
+              className="h-full bg-[#6366f1] transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -368,7 +368,7 @@ export default function OnboardingPage() {
                 className={cn(
                   "flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-colors",
                   canProceed()
-                    ? "bg-[#c9644a] hover:bg-[#b55840] text-white"
+                    ? "bg-[#6366f1] hover:bg-[#4f46e5] text-white"
                     : "bg-gray-100 text-gray-400 cursor-not-allowed"
                 )}
               >

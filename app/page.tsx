@@ -24,7 +24,7 @@ export default function LandingPage() {
 
           <div className="space-y-5">
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#c9644a] flex items-center justify-center mt-0.5">
+              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#6366f1] flex items-center justify-center mt-0.5">
                 <Check className="w-3 h-3 text-white" strokeWidth={3} />
               </div>
               <div>
@@ -39,7 +39,7 @@ export default function LandingPage() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#c9644a] flex items-center justify-center mt-0.5">
+              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#6366f1] flex items-center justify-center mt-0.5">
                 <Check className="w-3 h-3 text-white" strokeWidth={3} />
               </div>
               <div>
@@ -54,7 +54,7 @@ export default function LandingPage() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#c9644a] flex items-center justify-center mt-0.5">
+              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#6366f1] flex items-center justify-center mt-0.5">
                 <Check className="w-3 h-3 text-white" strokeWidth={3} />
               </div>
               <div>
@@ -96,7 +96,7 @@ export default function LandingPage() {
             {/* Rising curve */}
             <path
               d="M 0 180 Q 100 160 150 140 T 250 100 T 350 40 L 400 20"
-              stroke="#c9644a"
+              stroke="#6366f1"
               strokeWidth="3"
               fill="none"
               strokeLinecap="round"
@@ -110,7 +110,7 @@ export default function LandingPage() {
                 width="100"
                 height="40"
                 rx="8"
-                fill="#c9644a"
+                fill="#6366f1"
               />
               <text
                 x="0"
@@ -151,15 +151,15 @@ export default function LandingPage() {
           {/* Feature highlights */}
           <div className="grid grid-cols-3 gap-4 mb-10">
             <div className="text-center p-4 rounded-xl bg-[#faf9f7]">
-              <BarChart3 className="w-6 h-6 text-[#c9644a] mx-auto mb-2" />
+              <BarChart3 className="w-6 h-6 text-[#6366f1] mx-auto mb-2" />
               <p className="text-xs text-gray-600">Real-time analytics</p>
             </div>
             <div className="text-center p-4 rounded-xl bg-[#faf9f7]">
-              <Target className="w-6 h-6 text-[#c9644a] mx-auto mb-2" />
+              <Target className="w-6 h-6 text-[#6366f1] mx-auto mb-2" />
               <p className="text-xs text-gray-600">Competitor tracking</p>
             </div>
             <div className="text-center p-4 rounded-xl bg-[#faf9f7]">
-              <Zap className="w-6 h-6 text-[#c9644a] mx-auto mb-2" />
+              <Zap className="w-6 h-6 text-[#6366f1] mx-auto mb-2" />
               <p className="text-xs text-gray-600">AI optimization</p>
             </div>
           </div>
@@ -168,7 +168,7 @@ export default function LandingPage() {
           <div className="space-y-4">
             <Link
               href="/sign-up"
-              className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#c9644a] hover:bg-[#b55840] text-white font-medium rounded-xl transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#6366f1] hover:bg-[#4f46e5] text-white font-medium rounded-xl transition-colors"
             >
               Create free account
               <ArrowRight className="w-4 h-4" />
