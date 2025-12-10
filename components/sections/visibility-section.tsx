@@ -14,7 +14,7 @@ import { YourMentions } from "@/components/visibility/your-mentions";
 import { AIModelPerformance } from "@/components/visibility/ai-model-performance";
 
 interface VisibilitySectionProps {
-  workspaceId: string;
+  organizationId: string;
   domainId: string;
   domainName: string;
 }
@@ -49,7 +49,7 @@ interface VisibilityData {
 }
 
 export function VisibilitySection({
-  workspaceId,
+  organizationId,
   domainId,
   domainName,
 }: VisibilitySectionProps) {
@@ -96,7 +96,7 @@ export function VisibilitySection({
     async function fetchBrands() {
       try {
         const res = await fetch(
-          `/api/workspaces/${workspaceId}/domains/${domainId}/brands`
+          `/api/organizations/${organizationId}/domains/${domainId}/brands`
         );
         if (!res.ok) throw new Error("Failed to fetch brands");
         const data = await res.json();
@@ -107,7 +107,7 @@ export function VisibilitySection({
     }
 
     fetchBrands();
-  }, [workspaceId, domainId]);
+  }, [organizationId, domainId]);
 
   // Fetch visibility data
   const fetchVisibilityData = useCallback(async () => {
@@ -129,7 +129,7 @@ export function VisibilitySection({
       }
 
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/visibility?${params}`
+        `/api/organizations/${organizationId}/domains/${domainId}/visibility?${params}`
       );
 
       if (!res.ok) {
@@ -143,7 +143,7 @@ export function VisibilitySection({
     } finally {
       setIsLoading(false);
     }
-  }, [workspaceId, domainId, dateRange, platforms, selectedBrands]);
+  }, [organizationId, domainId, dateRange, platforms, selectedBrands]);
 
   useEffect(() => {
     fetchVisibilityData();
@@ -217,13 +217,13 @@ export function VisibilitySection({
         {/* Your Mentions & AI Model Performance */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <YourMentions
-            workspaceId={workspaceId}
+            organizationId={organizationId}
             domainId={domainId}
             timePeriod={timePeriod}
             platforms={platforms}
           />
           <AIModelPerformance
-            workspaceId={workspaceId}
+            organizationId={organizationId}
             domainId={domainId}
             timePeriod={timePeriod}
             platforms={platforms}
@@ -232,7 +232,7 @@ export function VisibilitySection({
 
         {/* Source Domains */}
         <SourceDomainsSection
-          workspaceId={workspaceId}
+          organizationId={organizationId}
           domainId={domainId}
           timePeriod={timePeriod}
           platforms={platforms}

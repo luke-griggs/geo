@@ -23,7 +23,7 @@ import type { NavSection } from "@/components/sidebar";
 import { useState } from "react";
 
 interface OverviewSectionProps {
-  workspaceId: string;
+  organizationId: string;
   domainId: string;
   domainName: string;
   onNavigate?: (section: NavSection) => void;
@@ -64,11 +64,11 @@ interface RunStatus {
 
 // Fetch functions
 async function fetchRunStatus(
-  workspaceId: string,
+  organizationId: string,
   domainId: string
 ): Promise<RunStatus> {
   const res = await fetch(
-    `/api/workspaces/${workspaceId}/domains/${domainId}/run-status`
+    `/api/organizations/${organizationId}/domains/${domainId}/run-status`
   );
   if (!res.ok) {
     throw new Error("Failed to fetch run status");
@@ -77,7 +77,7 @@ async function fetchRunStatus(
 }
 
 async function fetchOverviewData(
-  workspaceId: string,
+  organizationId: string,
   domainId: string,
   startDate: string,
   endDate: string
@@ -86,7 +86,7 @@ async function fetchOverviewData(
 
   // Fetch visibility data
   const visibilityRes = await fetch(
-    `/api/workspaces/${workspaceId}/domains/${domainId}/visibility?${params}`
+    `/api/organizations/${organizationId}/domains/${domainId}/visibility?${params}`
   );
 
   if (!visibilityRes.ok) {
@@ -97,7 +97,7 @@ async function fetchOverviewData(
 
   // Fetch platform breakdown (model performance)
   const modelRes = await fetch(
-    `/api/workspaces/${workspaceId}/domains/${domainId}/model-performance?${params}`
+    `/api/organizations/${organizationId}/domains/${domainId}/model-performance?${params}`
   );
 
   let platformBreakdown: PlatformVisibility[] = [];
@@ -184,7 +184,7 @@ function PlatformIcon({ platform }: { platform: string }) {
 }
 
 export function OverviewSection({
-  workspaceId,
+  organizationId,
   domainId,
   domainName,
   onNavigate,
@@ -204,8 +204,8 @@ export function OverviewSection({
   // Query for run status with smart polling
   // Polls every 2 seconds while status is pending/running, stops when completed
   const { data: runStatus, isLoading: isStatusLoading } = useQuery({
-    queryKey: ["runStatus", workspaceId, domainId],
-    queryFn: () => fetchRunStatus(workspaceId, domainId),
+    queryKey: ["runStatus", organizationId, domainId],
+    queryFn: () => fetchRunStatus(organizationId, domainId),
     // Poll every 2 seconds, but only if status is not completed
     refetchInterval: (query) => {
       const status = query.state.data?.status;
@@ -232,14 +232,14 @@ export function OverviewSection({
   } = useQuery({
     queryKey: [
       "overview",
-      workspaceId,
+      organizationId,
       domainId,
       dateRange.startDate,
       dateRange.endDate,
     ],
     queryFn: () =>
       fetchOverviewData(
-        workspaceId,
+        organizationId,
         domainId,
         dateRange.startDate,
         dateRange.endDate

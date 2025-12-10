@@ -107,7 +107,7 @@ function DomainLogo({
 interface SidebarProps {
   activeSection: NavSection;
   onSectionChange: (section: NavSection) => void;
-  workspaceId?: string;
+  organizationId?: string;
   domains?: Domain[];
   selectedDomainId?: string;
   onDomainChange?: (domainId: string) => void;
@@ -117,7 +117,7 @@ interface SidebarProps {
 export function Sidebar({
   activeSection,
   onSectionChange,
-  workspaceId,
+  organizationId,
   domains = [],
   selectedDomainId,
   onDomainChange,
@@ -455,11 +455,11 @@ export function Sidebar({
       />
 
       {/* Add Domain Modal */}
-      {workspaceId && (
+      {organizationId && (
         <AddDomainModal
           open={addDomainOpen}
           onOpenChange={setAddDomainOpen}
-          workspaceId={workspaceId}
+          organizationId={organizationId}
           onDomainAdded={onDomainAdded}
         />
       )}

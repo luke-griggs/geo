@@ -4,7 +4,7 @@
  * Usage:
  *   bun run scripts/run-prompts.ts                    # Run all prompts
  *   bun run scripts/run-prompts.ts --domain <id>     # Run prompts for a specific domain
- *   bun run scripts/run-prompts.ts --workspace <id>  # Run prompts for all domains in a workspace
+ *   bun run scripts/run-prompts.ts --organization <id>  # Run prompts for all domains in an organization
  *
  * Make sure to have your .env file configured with:
  *   - DATABASE_URL
@@ -284,20 +284,20 @@ async function main() {
   }
 
   const domainIndex = args.indexOf("--domain");
-  const workspaceIndex = args.indexOf("--workspace");
+  const organizationIndex = args.indexOf("--organization");
 
   if (domainIndex !== -1 && args[domainIndex + 1]) {
     // Run for specific domain
     const domainId = args[domainIndex + 1];
     console.log(`Running for domain: ${domainId}`);
     await runPromptsForDomain(domainId);
-  } else if (workspaceIndex !== -1 && args[workspaceIndex + 1]) {
-    // Run for all domains in a workspace
-    const workspaceId = args[workspaceIndex + 1];
-    console.log(`Running for workspace: ${workspaceId}`);
+  } else if (organizationIndex !== -1 && args[organizationIndex + 1]) {
+    // Run for all domains in an organization
+    const organizationId = args[organizationIndex + 1];
+    console.log(`Running for organization: ${organizationId}`);
 
     const domains = await db.query.domain.findMany({
-      where: eq(schema.domain.workspaceId, workspaceId),
+      where: eq(schema.domain.workspaceId, organizationId), // workspaceId is the column name in DB
     });
 
     for (const d of domains) {

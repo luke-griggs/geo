@@ -27,7 +27,7 @@ interface ContentItem {
 }
 
 interface ContentSectionProps {
-  workspaceId: string;
+  organizationId: string;
   domainId: string;
   domainName: string;
 }
@@ -90,7 +90,7 @@ function PublishDropdown({ published }: { published: boolean }) {
 }
 
 export function ContentSection({
-  workspaceId,
+  organizationId,
   domainId,
   domainName,
 }: ContentSectionProps) {

@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 
 interface MentionsSectionProps {
-  workspaceId: string;
+  organizationId: string;
   domainId: string;
   domainName: string;
 }
@@ -500,7 +500,7 @@ interface AggregateStats {
 }
 
 export function MentionsSection({
-  workspaceId,
+  organizationId,
   domainId,
   domainName,
 }: MentionsSectionProps) {
@@ -570,7 +570,7 @@ export function MentionsSection({
       }
 
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/queries?${params}`
+        `/api/organizations/${organizationId}/domains/${domainId}/queries?${params}`
       );
 
       if (!res.ok) {
@@ -592,7 +592,7 @@ export function MentionsSection({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    workspaceId,
+    organizationId,
     domainId,
     dateRange,
     showMentionsOnly,

@@ -687,7 +687,7 @@ export default function OnboardingPage() {
                 topic: topic.name,
                 domain: analysisResult.domain,
                 workspaceName: analysisResult.brandName,
-                count: 6,
+                count: 5,
               }),
             });
 
@@ -785,7 +785,7 @@ export default function OnboardingPage() {
 
       // 3. Save prompts to database using bulk API
       const promptsRes = await fetch(
-        `/api/workspaces/${organization.id}/domains/${createdDomain.id}/prompts/bulk`,
+        `/api/organizations/${organization.id}/domains/${createdDomain.id}/prompts/bulk`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -800,7 +800,7 @@ export default function OnboardingPage() {
 
       // 4. Trigger parallel prompt runs (fire and forget)
       fetch(
-        `/api/workspaces/${organization.id}/domains/${createdDomain.id}/run-parallel`,
+        `/api/organizations/${organization.id}/domains/${createdDomain.id}/run-parallel`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1091,20 +1091,9 @@ export default function OnboardingPage() {
                       )}
                     </div>
                     {/* Three Dots Menu */}
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenTopicMenu(
-                            openTopicMenu === topic.name ? null : topic.name
-                          );
-                        }}
-                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded transition-colors"
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
+                    <div className="flex items-center gap-2">
                       {openTopicMenu === topic.name && (
-                        <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                        <>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1112,7 +1101,7 @@ export default function OnboardingPage() {
                               setEditingTopicNameText(topic.name);
                               setOpenTopicMenu(null);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                             Edit Topic
@@ -1125,13 +1114,23 @@ export default function OnboardingPage() {
                               );
                               setOpenTopicMenu(null);
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                            className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Delete Topic
+                            <Trash2 className="w-4 h-4" />
                           </button>
-                        </div>
+                        </>
                       )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenTopicMenu(
+                            openTopicMenu === topic.name ? null : topic.name
+                          );
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded transition-colors"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
 

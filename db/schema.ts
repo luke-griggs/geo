@@ -146,9 +146,6 @@ export const organization = pgTable(
   ]
 );
 
-// Alias for backward compatibility in code
-export const workspace = organization;
-
 export const organizationMember = pgTable(
   "organization_member",
   {

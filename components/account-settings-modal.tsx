@@ -46,20 +46,20 @@ const settingsTabs = [
     id: "organization" as const,
     label: "Organization",
     icon: Building2,
-    section: "WORKSPACE",
+    section: "ORGANIZATION",
   },
   {
     id: "domains" as const,
     label: "Domains",
     icon: Globe,
-    section: "WORKSPACE",
+    section: "ORGANIZATION",
   },
-  { id: "team" as const, label: "Team", icon: Users, section: "WORKSPACE" },
+  { id: "team" as const, label: "Team", icon: Users, section: "ORGANIZATION" },
   {
     id: "integrations" as const,
     label: "Integrations",
     icon: Zap,
-    section: "WORKSPACE",
+    section: "ORGANIZATION",
   },
 ];
 
@@ -699,8 +699,8 @@ function OrganizationTab() {
           B
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          Upload an image to represent your workspace. JPG, PNG, GIF, or WebP up
-          to 5MB.
+          Upload an image to represent your organization. JPG, PNG, GIF, or WebP
+          up to 5MB.
         </p>
       </div>
 
@@ -787,8 +787,8 @@ function DomainsTab() {
       <div>
         <h3 className="font-semibold text-gray-900 mb-1">All Domains</h3>
         <p className="text-sm text-gray-500">
-          View and manage all domains across your workspaces. Click on a domain
-          to edit its settings.
+          View and manage all domains across your organization. Click on a
+          domain to edit its settings.
         </p>
       </div>
 
@@ -1029,7 +1029,9 @@ export function AccountSettingsModal({
 
   // Group tabs by section
   const userTabs = settingsTabs.filter((t) => t.section === "USER");
-  const workspaceTabs = settingsTabs.filter((t) => t.section === "WORKSPACE");
+  const organizationTabs = settingsTabs.filter(
+    (t) => t.section === "ORGANIZATION"
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1077,7 +1079,7 @@ export function AccountSettingsModal({
                 Workspace
               </p>
               <nav className="space-y-1">
-                {workspaceTabs.map((tab) => {
+                {organizationTabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
                   return (

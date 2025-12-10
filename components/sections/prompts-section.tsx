@@ -60,7 +60,7 @@ interface Prompt {
 }
 
 interface PromptsSectionProps {
-  workspaceId: string;
+  organizationId: string;
   domainId: string;
   domainName: string;
 }
@@ -421,7 +421,7 @@ function CreatePromptModal({
 }
 
 export function PromptsSection({
-  workspaceId,
+  organizationId,
   domainId,
   domainName,
 }: PromptsSectionProps) {
@@ -467,10 +467,10 @@ export function PromptsSection({
     try {
       const [activeRes, archivedRes] = await Promise.all([
         fetch(
-          `/api/workspaces/${workspaceId}/domains/${domainId}/prompts?archived=false`
+          `/api/organizations/${organizationId}/domains/${domainId}/prompts?archived=false`
         ),
         fetch(
-          `/api/workspaces/${workspaceId}/domains/${domainId}/prompts?archived=true`
+          `/api/organizations/${organizationId}/domains/${domainId}/prompts?archived=true`
         ),
       ]);
 
@@ -490,7 +490,7 @@ export function PromptsSection({
     } finally {
       setIsLoading(false);
     }
-  }, [workspaceId, domainId]);
+  }, [organizationId, domainId]);
 
   useEffect(() => {
     fetchAllPrompts();
@@ -501,7 +501,7 @@ export function PromptsSection({
     setIsSubmitting(true);
     try {
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/prompts`,
+        `/api/organizations/${organizationId}/domains/${domainId}/prompts`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -531,7 +531,7 @@ export function PromptsSection({
     setRunningPromptIds((prev) => new Set(prev).add(promptId));
     try {
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/prompts/${promptId}/run`,
+        `/api/organizations/${organizationId}/domains/${domainId}/prompts/${promptId}/run`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -562,7 +562,7 @@ export function PromptsSection({
     setIsArchiving(true);
     try {
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/prompts/${promptId}`,
+        `/api/organizations/${organizationId}/domains/${domainId}/prompts/${promptId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -603,7 +603,7 @@ export function PromptsSection({
     try {
       const promises = Array.from(selectedPromptIds).map((promptId) =>
         fetch(
-          `/api/workspaces/${workspaceId}/domains/${domainId}/prompts/${promptId}`,
+          `/api/organizations/${organizationId}/domains/${domainId}/prompts/${promptId}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },

@@ -61,7 +61,7 @@ interface PromptDetail {
 
 interface PromptDetailViewProps {
   prompt: PromptDetail;
-  workspaceId: string;
+  organizationId: string;
   domainId: string;
 }
 
@@ -97,7 +97,7 @@ function getModelIcon(model: string) {
 
 export function PromptDetailView({
   prompt,
-  workspaceId,
+  organizationId,
   domainId,
 }: PromptDetailViewProps) {
   const router = useRouter();
@@ -137,7 +137,7 @@ export function PromptDetailView({
     setSavingModels(true);
     try {
       const response = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/prompts/${prompt.id}`,
+        `/api/organizations/${organizationId}/domains/${domainId}/prompts/${prompt.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -160,7 +160,7 @@ export function PromptDetailView({
     setIsUpdating(true);
     try {
       const response = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/prompts/${prompt.id}`,
+        `/api/organizations/${organizationId}/domains/${domainId}/prompts/${prompt.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

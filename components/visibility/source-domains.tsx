@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/tooltip";
 
 interface SourceDomainsProps {
-  workspaceId: string;
+  organizationId: string;
   domainId: string;
   timePeriod: string;
   platforms: string[];
@@ -43,7 +43,7 @@ const CHART_COLORS = [
 ];
 
 export function SourceDomainsSection({
-  workspaceId,
+  organizationId,
   domainId,
   timePeriod,
   platforms,
@@ -92,7 +92,7 @@ export function SourceDomainsSection({
       }
 
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/source-domains?${params}`
+        `/api/organizations/${organizationId}/domains/${domainId}/source-domains?${params}`
       );
 
       if (!res.ok) {
@@ -106,7 +106,7 @@ export function SourceDomainsSection({
     } finally {
       setIsLoading(false);
     }
-  }, [workspaceId, domainId, dateRange, platforms]);
+  }, [organizationId, domainId, dateRange, platforms]);
 
   useEffect(() => {
     fetchSourceDomains();

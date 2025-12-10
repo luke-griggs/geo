@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import db from "@/db";
 import { organization, organizationMember, domain } from "@/db/schema";
 import { generateId, generateUniqueSlug } from "@/lib/id";
-import { eq, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
@@ -153,4 +153,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

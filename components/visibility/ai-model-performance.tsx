@@ -11,7 +11,7 @@ import {
 import { TimePeriod, Platform } from "./filter-bar";
 
 interface AIModelPerformanceProps {
-  workspaceId: string;
+  organizationId: string;
   domainId: string;
   timePeriod: TimePeriod;
   platforms: Platform[];
@@ -65,7 +65,7 @@ function SourceIcon({ source }: { source: string }) {
 type ViewMode = "table" | "chart";
 
 export function AIModelPerformance({
-  workspaceId,
+  organizationId,
   domainId,
   timePeriod,
   platforms,
@@ -109,7 +109,7 @@ export function AIModelPerformance({
       }
 
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/queries?${params}`
+        `/api/organizations/${organizationId}/domains/${domainId}/queries?${params}`
       );
 
       if (!res.ok) {
@@ -195,7 +195,7 @@ export function AIModelPerformance({
     } finally {
       setIsLoading(false);
     }
-  }, [workspaceId, domainId, timePeriod, platforms]);
+  }, [organizationId, domainId, timePeriod, platforms]);
 
   useEffect(() => {
     fetchModelStats();

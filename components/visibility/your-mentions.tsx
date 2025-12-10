@@ -11,7 +11,7 @@ import {
 import { TimePeriod, Platform } from "./filter-bar";
 
 interface YourMentionsProps {
-  workspaceId: string;
+  organizationId: string;
   domainId: string;
   timePeriod: TimePeriod;
   platforms: Platform[];
@@ -64,7 +64,7 @@ function SourceIcon({ source }: { source: string }) {
 }
 
 export function YourMentions({
-  workspaceId,
+  organizationId,
   domainId,
   timePeriod,
   platforms,
@@ -108,7 +108,7 @@ export function YourMentions({
       }
 
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/queries?${params}`
+        `/api/organizations/${organizationId}/domains/${domainId}/queries?${params}`
       );
 
       if (!res.ok) {
@@ -144,7 +144,7 @@ export function YourMentions({
     } finally {
       setIsLoading(false);
     }
-  }, [workspaceId, domainId, timePeriod, platforms]);
+  }, [organizationId, domainId, timePeriod, platforms]);
 
   useEffect(() => {
     fetchMentions();

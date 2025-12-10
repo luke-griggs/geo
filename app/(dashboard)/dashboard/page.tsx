@@ -19,16 +19,13 @@ interface Organization {
   domains: Domain[];
 }
 
-// Alias for backward compatibility
-type Workspace = Organization;
-
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sectionParam = searchParams.get("section");
   const domainParam = searchParams.get("domain");
 
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [organization, setOrganization] = useState<Organization | null>(null);
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,22 +52,22 @@ function DashboardContent() {
   };
 
   const handleDomainAdded = (newDomain: Domain) => {
-    if (workspace) {
+    if (organization) {
       // Add new domain to the list
-      setWorkspace({
-        ...workspace,
-        domains: [newDomain, ...workspace.domains],
+      setOrganization({
+        ...organization,
+        domains: [newDomain, ...organization.domains],
       });
       // Select the newly added domain
       handleDomainChange(newDomain.id);
     }
   };
 
-  // Fetch user's workspace and domain on mount
+  // Fetch user's organization and domain on mount
   useEffect(() => {
-    async function fetchWorkspace() {
+    async function fetchOrganization() {
       try {
-        const res = await fetch("/api/workspaces");
+        const res = await fetch("/api/organizations");
 
         // Handle unauthorized - sign out and redirect to onboarding
         if (res.status === 401) {
@@ -80,26 +77,26 @@ function DashboardContent() {
         }
 
         if (!res.ok) {
-          throw new Error("Failed to fetch workspaces");
+          throw new Error("Failed to fetch organizations");
         }
         const data = await res.json();
 
-        // Use the first workspace (most recent)
-        if (data.workspaces && data.workspaces.length > 0) {
-          const ws = data.workspaces[0];
-          setWorkspace(ws);
+        // Use the first organization (most recent)
+        if (data.organizations && data.organizations.length > 0) {
+          const org = data.organizations[0];
+          setOrganization(org);
 
           // Set selected domain from URL param or default to first domain
-          if (ws.domains.length > 0) {
-            const domainFromUrl = ws.domains.find(
+          if (org.domains.length > 0) {
+            const domainFromUrl = org.domains.find(
               (d: Domain) => d.id === domainParam
             );
             setSelectedDomainId(
-              domainFromUrl ? domainFromUrl.id : ws.domains[0].id
+              domainFromUrl ? domainFromUrl.id : org.domains[0].id
             );
           }
         } else {
-          // No workspace found, redirect to onboarding
+          // No organization found, redirect to onboarding
           router.push("/onboarding");
         }
       } catch (err) {
@@ -109,7 +106,7 @@ function DashboardContent() {
       }
     }
 
-    fetchWorkspace();
+    fetchOrganization();
   }, [router, domainParam]);
 
   if (isLoading) {
@@ -117,7 +114,7 @@ function DashboardContent() {
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-          <p className="text-sm text-gray-500">Loading your workspace...</p>
+          <p className="text-sm text-gray-500">Loading your organization...</p>
         </div>
       </div>
     );
@@ -139,7 +136,7 @@ function DashboardContent() {
     );
   }
 
-  if (!workspace || workspace.domains.length === 0) {
+  if (!organization || organization.domains.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
@@ -157,16 +154,16 @@ function DashboardContent() {
 
   // Get the selected domain or fall back to first
   const domain =
-    workspace.domains.find((d) => d.id === selectedDomainId) ||
-    workspace.domains[0];
+    organization.domains.find((d) => d.id === selectedDomainId) ||
+    organization.domains[0];
 
   return (
     <div className="flex min-h-screen bg-white">
       <Sidebar
         activeSection={activeSection}
         onSectionChange={handleSectionChange}
-        workspaceId={workspace.id}
-        domains={workspace.domains}
+        organizationId={organization.id}
+        domains={organization.domains}
         selectedDomainId={domain.id}
         onDomainChange={handleDomainChange}
         onDomainAdded={handleDomainAdded}
@@ -177,7 +174,7 @@ function DashboardContent() {
         <div className="p-8 pb-16 h-screen overflow-auto">
           {activeSection === "overview" && (
             <OverviewSection
-              workspaceId={workspace.id}
+              organizationId={organization.id}
               domainId={domain.id}
               domainName={domain.domain}
               onNavigate={handleSectionChange}
@@ -185,28 +182,28 @@ function DashboardContent() {
           )}
           {activeSection === "prompts" && (
             <PromptsSection
-              workspaceId={workspace.id}
+              organizationId={organization.id}
               domainId={domain.id}
               domainName={domain.domain}
             />
           )}
           {activeSection === "visibility" && (
             <VisibilitySection
-              workspaceId={workspace.id}
+              organizationId={organization.id}
               domainId={domain.id}
               domainName={domain.domain}
             />
           )}
           {activeSection === "mentions" && (
             <MentionsSection
-              workspaceId={workspace.id}
+              organizationId={organization.id}
               domainId={domain.id}
               domainName={domain.domain}
             />
           )}
           {activeSection === "content" && (
             <ContentSection
-              workspaceId={workspace.id}
+              organizationId={organization.id}
               domainId={domain.id}
               domainName={domain.domain}
             />

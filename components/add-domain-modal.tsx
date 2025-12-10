@@ -13,7 +13,7 @@ import {
 interface AddDomainModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workspaceId: string;
+  organizationId: string;
   onDomainAdded?: (domain: {
     id: string;
     domain: string;
@@ -83,7 +83,7 @@ interface NominatimResult {
 export function AddDomainModal({
   open,
   onOpenChange,
-  workspaceId,
+  organizationId,
   onDomainAdded,
 }: AddDomainModalProps) {
   const [step, setStep] = useState<Step>("domain");
@@ -224,18 +224,21 @@ export function AddDomainModal({
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/workspaces/${workspaceId}/domains`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          domain: cleanedDomain,
-          name: displayName || cleanedDomain,
-          description: description || undefined,
-          location: location || undefined,
-        }),
-      });
+      const response = await fetch(
+        `/api/organizations/${organizationId}/domains`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            domain: cleanedDomain,
+            name: displayName || cleanedDomain,
+            description: description || undefined,
+            location: location || undefined,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to create domain");
