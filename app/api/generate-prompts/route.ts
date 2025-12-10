@@ -60,7 +60,7 @@ Categories:
 - "recommendation": Asking for suggestions on what to choose
 - "problem_solution": Looking to solve a specific problem
 
-Return ONLY a valid JSON array of objects with "text" and "category" fields. Do not include anything in 
+Return ONLY a valid JSON array of objects with "text" and "category" fields. Do not include anything except the json array in your resposne 
 
 Example output for a scheduling software company:
 [
