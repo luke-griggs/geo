@@ -5,8 +5,51 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, Loader2, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { emailOtp, signIn, signUp } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 
-type OnboardingStep = "email" | "signin" | "company" | "account" | "verify";
+// Domain logo component with fallback
+function DomainLogo({
+  domain,
+  className,
+}: {
+  domain: string;
+  className?: string;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  // Reset state when domain changes
+  useEffect(() => {
+    setImgError(false);
+    setImgLoaded(false);
+  }, [domain]);
+
+  if (imgError || !domain) {
+    return null;
+  }
+
+  return (
+    <img
+      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+      alt=""
+      className={cn(
+        "rounded flex-shrink-0 transition-opacity duration-200",
+        imgLoaded ? "opacity-100" : "opacity-0",
+        className
+      )}
+      onLoad={() => setImgLoaded(true)}
+      onError={() => setImgError(true)}
+    />
+  );
+}
+
+type OnboardingStep =
+  | "email"
+  | "signin"
+  | "company"
+  | "account"
+  | "verify"
+  | "brand";
 
 const COMPANY_SIZES = [
   "1-10 employees",
@@ -35,6 +78,25 @@ export default function OnboardingPage() {
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
+
+  // Brand step data
+  const [website, setWebsite] = useState("");
+  const [brandDescription, setBrandDescription] = useState("");
+  const [websiteError, setWebsiteError] = useState<string | null>(null);
+  const [isValidatingDomain, setIsValidatingDomain] = useState(false);
+
+  // Clean website input to get favicon
+  const cleanedWebsite = website
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "")
+    .trim();
+
+  // Check if domain looks valid (has at least 2 characters after the last dot)
+  const lastDotIndex = cleanedWebsite.lastIndexOf(".");
+  const hasValidTLD =
+    lastDotIndex > 0 && cleanedWebsite.length - lastDotIndex > 2;
+  const showFavicon = hasValidTLD;
 
   // Refs for OTP inputs
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -256,7 +318,10 @@ export default function OnboardingPage() {
       });
 
       if (verifyResult.error) {
-        console.error("[Onboarding] Email verification error:", verifyResult.error);
+        console.error(
+          "[Onboarding] Email verification error:",
+          verifyResult.error
+        );
         setError(verifyResult.error.message || "Invalid verification code");
         setIsLoading(false);
         return;
@@ -271,18 +336,22 @@ export default function OnboardingPage() {
       });
 
       if (signInResult.error) {
-        console.error("[Onboarding] Sign in after verify error:", signInResult.error);
+        console.error(
+          "[Onboarding] Sign in after verify error:",
+          signInResult.error
+        );
         // Even if sign-in fails, the account is verified - try redirecting
         // The user might already have a session from signUp
       }
 
-      // Success - redirect to dashboard
-      router.push("/dashboard");
+      // Success - move to brand setup step
+      goToStep("brand", "right");
+      setIsLoading(false);
     } catch {
       setError("Failed to verify email");
       setIsLoading(false);
     }
-  }, [otp, email, password, router]);
+  }, [otp, email, password]);
 
   const handleResend = async () => {
     if (!canResend) return;
@@ -312,8 +381,69 @@ export default function OnboardingPage() {
     }
   };
 
+  const handleBrandSubmit = async () => {
+    if (!website.trim()) return;
+
+    setIsValidatingDomain(true);
+    setWebsiteError(null);
+
+    try {
+      const response = await fetch("/api/validate-domain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: website }),
+      });
+
+      const result = await response.json();
+
+      if (!result.valid) {
+        setWebsiteError(result.error || "Invalid domain");
+        setIsValidatingDomain(false);
+        return;
+      }
+
+      // Store brand data for later use (when creating organization/domain)
+      localStorage.setItem("onboarding_website", result.domain || website);
+      localStorage.setItem("onboarding_brand_description", brandDescription);
+
+      // Success - redirect to dashboard
+      router.push("/dashboard");
+    } catch {
+      setWebsiteError("Failed to validate domain. Please try again.");
+    } finally {
+      setIsValidatingDomain(false);
+    }
+  };
+
+  const handleWrongAccount = async () => {
+    // Clear all onboarding data and go back to email step
+    localStorage.removeItem("onboarding_company_size");
+    localStorage.removeItem("onboarding_is_agency");
+    localStorage.removeItem("onboarding_first_name");
+    localStorage.removeItem("onboarding_last_name");
+    localStorage.removeItem("onboarding_website");
+    localStorage.removeItem("onboarding_brand_description");
+
+    // Reset all form state
+    setEmail("");
+    setPassword("");
+    setFirstName("");
+    setLastName("");
+    setCompanySize(null);
+    setIsAgency(false);
+    setOtp(["", "", "", "", "", ""]);
+    setWebsite("");
+    setBrandDescription("");
+    setWebsiteError(null);
+    setError(null);
+    setTermsAccepted(false);
+
+    goToStep("email", "left");
+  };
+
   const goBack = () => {
     setError(null);
+    setWebsiteError(null);
     if (currentStep === "signin") {
       goToStep("email", "right");
       setPassword("");
@@ -323,6 +453,9 @@ export default function OnboardingPage() {
       goToStep("company", "left");
     } else if (currentStep === "verify") {
       goToStep("account", "left");
+    } else if (currentStep === "brand") {
+      // Cannot go back from brand step (user is already verified)
+      // This is intentional - they can use "Wrong account?" instead
     }
   };
 
@@ -873,43 +1006,179 @@ export default function OnboardingPage() {
                 </div>
               </motion.div>
             )}
+
+            {currentStep === "brand" && (
+              <motion.div
+                key="brand"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                className="flex flex-col h-full"
+              >
+                <div className="flex-1">
+                  <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                    Start tracking your brand
+                  </h1>
+                  <p className="text-gray-500 mb-8">
+                    This will be the first brand you&apos;ll track on GEO
+                    Analytics — you can add more later.
+                  </p>
+
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        Website
+                      </label>
+                      <div className="relative">
+                        {showFavicon && (
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                            <DomainLogo
+                              domain={cleanedWebsite}
+                              className="w-5 h-5"
+                            />
+                          </div>
+                        )}
+                        <span
+                          className={cn(
+                            "absolute top-1/2 -translate-y-1/2 text-gray-400 text-sm transition-all",
+                            showFavicon ? "left-10" : "left-4"
+                          )}
+                        >
+                          https://
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="www.example.com"
+                          value={website}
+                          onChange={(e) => {
+                            setWebsite(e.target.value);
+                            setWebsiteError(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (
+                              e.key === "Enter" &&
+                              website.trim() &&
+                              !isValidatingDomain
+                            ) {
+                              handleBrandSubmit();
+                            }
+                          }}
+                          autoFocus
+                          className={cn(
+                            "w-full pr-4 py-3 rounded-lg border bg-white focus:outline-none focus:ring-2 transition-all",
+                            showFavicon ? "pl-[106px]" : "pl-16",
+                            websiteError
+                              ? "border-red-500 focus:ring-red-500/20 focus:border-red-500"
+                              : "border-gray-200 focus:ring-[#6366f1]/20 focus:border-[#6366f1]"
+                          )}
+                        />
+                      </div>
+                      {websiteError && (
+                        <p className="text-red-500 text-sm mt-2">
+                          {websiteError}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        Tell us about your brand (optional)
+                      </label>
+                      <textarea
+                        placeholder="About your brand..."
+                        value={brandDescription}
+                        onChange={(e) => setBrandDescription(e.target.value)}
+                        rows={4}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors resize-none"
+                      />
+                      <p className="text-gray-500 text-sm mt-3">
+                        The more specific you are, the better the results
+                        we&apos;ll be able to provide.
+                      </p>
+                      <ul className="text-gray-500 text-sm mt-2 space-y-1 list-disc list-inside">
+                        <li>What products or services do you offer?</li>
+                        <li>Do you serve any specific regions?</li>
+                      </ul>
+                    </div>
+
+                    <button
+                      onClick={handleBrandSubmit}
+                      disabled={!website.trim() || isValidatingDomain}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-900 font-medium rounded-lg transition-colors"
+                    >
+                      {isValidatingDomain ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Validating...
+                        </>
+                      ) : (
+                        "Continue"
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Wrong account link */}
+                <div className="mt-auto pt-12">
+                  <button
+                    onClick={handleWrongAccount}
+                    className="text-sm text-gray-500 hover:text-gray-900 underline transition-colors"
+                  >
+                    Wrong account?
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 
         {/* Footer Navigation */}
-        {currentStep !== "email" && currentStep !== "signin" && (
-          <div className="px-8 lg:px-16 xl:px-24 py-6 max-w-xl mx-auto w-full flex items-center justify-between">
-            <button
-              onClick={goBack}
-              className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </button>
+        {currentStep !== "email" &&
+          currentStep !== "signin" &&
+          currentStep !== "brand" && (
+            <div className="px-8 lg:px-16 xl:px-24 py-6 max-w-xl mx-auto w-full flex items-center justify-between">
+              <button
+                onClick={goBack}
+                className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </button>
 
-            {/* Progress dots */}
-            <div className="flex items-center gap-1.5">
-              {["email", "company", "account", "verify"].map((step, index) => {
-                const stepOrder = ["email", "company", "account", "verify"];
-                const currentIndex = stepOrder.indexOf(currentStep);
-                const isActive = index <= currentIndex;
-                const isCurrent = step === currentStep;
-                return (
-                  <div
-                    key={step}
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      isCurrent
-                        ? "w-6 bg-gray-900"
-                        : isActive
-                        ? "w-2 bg-gray-900"
-                        : "w-2 bg-gray-300"
-                    }`}
-                  />
-                );
-              })}
+              {/* Progress dots */}
+              <div className="flex items-center gap-1.5">
+                {["email", "company", "account", "verify", "brand"].map(
+                  (step, index) => {
+                    const stepOrder = [
+                      "email",
+                      "company",
+                      "account",
+                      "verify",
+                      "brand",
+                    ];
+                    const currentIndex = stepOrder.indexOf(currentStep);
+                    const isActive = index <= currentIndex;
+                    const isCurrent = step === currentStep;
+                    return (
+                      <div
+                        key={step}
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          isCurrent
+                            ? "w-6 bg-gray-900"
+                            : isActive
+                            ? "w-2 bg-gray-900"
+                            : "w-2 bg-gray-300"
+                        }`}
+                      />
+                    );
+                  }
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
         {currentStep === "signin" && (
           <div className="px-8 lg:px-16 xl:px-24 py-6 max-w-xl mx-auto w-full">
             <button
