@@ -2,7 +2,16 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowUpRight, Loader2, Eye, EyeOff } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Loader2,
+  Eye,
+  EyeOff,
+  Plus,
+  Check,
+  X,
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { emailOtp, signIn, signUp } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
@@ -17,12 +26,14 @@ function DomainLogo({
 }) {
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [prevDomain, setPrevDomain] = useState(domain);
 
-  // Reset state when domain changes
-  useEffect(() => {
+  // Reset state when domain changes - React's recommended pattern for adjusting state based on props
+  if (prevDomain !== domain) {
+    setPrevDomain(domain);
     setImgError(false);
     setImgLoaded(false);
-  }, [domain]);
+  }
 
   if (imgError || !domain) {
     return null;
@@ -50,7 +61,15 @@ type OnboardingStep =
   | "account"
   | "verify"
   | "brand"
-  | "analysis";
+  | "analysis"
+  | "daily-prompts"
+  | "topics";
+
+// Topic suggestion from the API
+interface TopicSuggestion {
+  name: string;
+  description: string;
+}
 
 // Analysis result type matching the API response
 interface AnalysisResult {
@@ -62,6 +81,7 @@ interface AnalysisResult {
   competitors: { name: string; domain: string | null; mentionCount: number }[];
   totalMentions: number;
   totalPrompts: number;
+  topics: TopicSuggestion[];
 }
 
 // AI Model icons component
@@ -122,6 +142,20 @@ const COMPANY_SIZES = [
   "1001+ employees",
 ] as const;
 
+// Analysis loading messages - starts descriptive, gets progressively more humorous
+const ANALYSIS_MESSAGES = [
+  "Visiting your website...",
+  "Reading about your brand...",
+  "Identifying your industry...",
+  "Crafting some test prompts...",
+  "Asking ChatGPT about you...",
+  "Counting your mentions...",
+  "Comparing you to competitors...",
+  "Negotiating with the AI overlords...",
+  "Training the neural networks...",
+  "Almost there, we promise...",
+];
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("email");
@@ -154,6 +188,13 @@ export default function OnboardingPage() {
     null
   );
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisMessageIndex, setAnalysisMessageIndex] = useState(0);
+
+  // Topics step data
+  const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
+  const [customTopics, setCustomTopics] = useState<TopicSuggestion[]>([]);
+  const [isAddingCustomTopic, setIsAddingCustomTopic] = useState(false);
+  const [customTopicInput, setCustomTopicInput] = useState("");
 
   // Clean website input to get favicon
   const cleanedWebsite = website
@@ -180,6 +221,29 @@ export default function OnboardingPage() {
       setCanResend(true);
     }
   }, [currentStep, resendTimer]);
+
+  // Cycle through analysis messages
+  useEffect(() => {
+    if (isAnalyzing) {
+      setAnalysisMessageIndex(0);
+      const interval = setInterval(() => {
+        setAnalysisMessageIndex((prev) =>
+          prev < ANALYSIS_MESSAGES.length - 1 ? prev + 1 : prev
+        );
+      }, 2500);
+      return () => clearInterval(interval);
+    }
+  }, [isAnalyzing]);
+
+  // Pre-select first 5 topics when analysis completes
+  useEffect(() => {
+    if (analysisResult?.topics && analysisResult.topics.length > 0) {
+      const initialTopics = new Set(
+        analysisResult.topics.slice(0, 5).map((t) => t.name)
+      );
+      setSelectedTopics(initialTopics);
+    }
+  }, [analysisResult]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -516,8 +580,8 @@ export default function OnboardingPage() {
   };
 
   const handleAnalysisContinue = () => {
-    // Redirect to dashboard
-    router.push("/dashboard");
+    // Move to daily prompts explanation step
+    goToStep("daily-prompts", "right");
   };
 
   const handleWrongAccount = async () => {
@@ -1258,10 +1322,20 @@ export default function OnboardingPage() {
                     <h2 className="text-xl font-semibold text-gray-900 mb-2">
                       Analyzing your brand&apos;s AI visibility
                     </h2>
-                    <p className="text-gray-500 text-center max-w-sm">
-                      We&apos;re checking how often AI assistants recommend your
-                      brand. This may take a minute...
-                    </p>
+                    <div className="h-6 flex items-center justify-center">
+                      <AnimatePresence mode="wait">
+                        <motion.p
+                          key={analysisMessageIndex}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ duration: 0.3 }}
+                          className="text-gray-500 text-center"
+                        >
+                          {ANALYSIS_MESSAGES[analysisMessageIndex]}
+                        </motion.p>
+                      </AnimatePresence>
+                    </div>
                   </div>
                 ) : analysisError ? (
                   // Error state
@@ -1359,6 +1433,219 @@ export default function OnboardingPage() {
                 ) : null}
               </motion.div>
             )}
+
+            {currentStep === "daily-prompts" && analysisResult && (
+              <motion.div
+                key="daily-prompts"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                className="flex flex-col h-full"
+              >
+                <div className="flex-1">
+                  {/* Brand header */}
+                  <div className="flex items-center gap-3 mb-8">
+                    <DomainLogo
+                      domain={analysisResult.domain}
+                      className="w-6 h-6"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">
+                        {analysisResult.brandName}
+                      </span>
+                      <span className="text-gray-400">
+                        {analysisResult.domain}
+                      </span>
+                    </div>
+                  </div>
+
+                  <h1 className="text-2xl font-bold text-gray-900 mb-4">
+                    We run your prompts daily to analyze your brand&apos;s
+                    performance
+                  </h1>
+                  <p className="text-gray-500 mb-8">
+                    We look for your brand in answers, citations, and mentions
+                    to understand how you&apos;re showing up in ChatGPT, Google
+                    AI Overviews, Perplexity, Microsoft Copilot, and more.
+                  </p>
+
+                  <button
+                    onClick={() => goToStep("topics", "right")}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {currentStep === "topics" && analysisResult && (
+              <motion.div
+                key="topics"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                className="flex flex-col h-full"
+              >
+                <div className="flex-1">
+                  {/* Brand header */}
+                  <div className="flex items-center gap-3 mb-8">
+                    <DomainLogo
+                      domain={analysisResult.domain}
+                      className="w-6 h-6"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">
+                        {analysisResult.brandName}
+                      </span>
+                      <span className="text-gray-400">
+                        {analysisResult.domain}
+                      </span>
+                    </div>
+                  </div>
+
+                  <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                    Which topics do you want to create prompts for?
+                  </h1>
+                  <p className="text-gray-500 mb-6">Select up to 10 topics</p>
+
+                  {/* Topics list */}
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {[...analysisResult.topics, ...customTopics].map(
+                      (topic) => {
+                        const isSelected = selectedTopics.has(topic.name);
+                        const canSelect =
+                          isSelected || selectedTopics.size < 10;
+
+                        return (
+                          <button
+                            key={topic.name}
+                            onClick={() => {
+                              if (!canSelect) return;
+                              const newSelected = new Set(selectedTopics);
+                              if (isSelected) {
+                                newSelected.delete(topic.name);
+                              } else {
+                                newSelected.add(topic.name);
+                              }
+                              setSelectedTopics(newSelected);
+                            }}
+                            disabled={!canSelect}
+                            className={cn(
+                              "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
+                              isSelected
+                                ? "bg-gray-900 border-gray-900 text-white"
+                                : canSelect
+                                ? "bg-white border-gray-200 text-gray-900 hover:border-gray-300"
+                                : "bg-gray-50 border-gray-100 text-gray-400 cursor-not-allowed"
+                            )}
+                          >
+                            {isSelected && <Check className="w-4 h-4" />}
+                            {topic.name}
+                          </button>
+                        );
+                      }
+                    )}
+
+                    {/* Add custom topic button/input */}
+                    {isAddingCustomTopic ? (
+                      <div className="inline-flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={customTopicInput}
+                          onChange={(e) => setCustomTopicInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && customTopicInput.trim()) {
+                              const newTopic = {
+                                name: customTopicInput.trim(),
+                                description: "Custom topic",
+                              };
+                              setCustomTopics([...customTopics, newTopic]);
+                              setSelectedTopics(
+                                new Set([
+                                  ...selectedTopics,
+                                  customTopicInput.trim(),
+                                ])
+                              );
+                              setCustomTopicInput("");
+                              setIsAddingCustomTopic(false);
+                            } else if (e.key === "Escape") {
+                              setCustomTopicInput("");
+                              setIsAddingCustomTopic(false);
+                            }
+                          }}
+                          autoFocus
+                          placeholder="Enter topic..."
+                          className="px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-900 w-40"
+                        />
+                        <button
+                          onClick={() => {
+                            if (customTopicInput.trim()) {
+                              const newTopic = {
+                                name: customTopicInput.trim(),
+                                description: "Custom topic",
+                              };
+                              setCustomTopics([...customTopics, newTopic]);
+                              setSelectedTopics(
+                                new Set([
+                                  ...selectedTopics,
+                                  customTopicInput.trim(),
+                                ])
+                              );
+                              setCustomTopicInput("");
+                              setIsAddingCustomTopic(false);
+                            }
+                          }}
+                          className="p-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setCustomTopicInput("");
+                            setIsAddingCustomTopic(false);
+                          }}
+                          className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setIsAddingCustomTopic(true)}
+                        disabled={selectedTopics.size >= 10}
+                        className={cn(
+                          "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-dashed text-sm font-medium transition-all",
+                          selectedTopics.size < 10
+                            ? "border-gray-300 text-gray-600 hover:border-gray-400 hover:text-gray-900"
+                            : "border-gray-200 text-gray-400 cursor-not-allowed"
+                        )}
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add custom
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      // TODO: Save selected topics and redirect to dashboard
+                      router.push("/dashboard");
+                    }}
+                    disabled={selectedTopics.size === 0}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                  >
+                    Looks good
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 
@@ -1366,7 +1653,9 @@ export default function OnboardingPage() {
         {currentStep !== "email" &&
           currentStep !== "signin" &&
           currentStep !== "brand" &&
-          currentStep !== "analysis" && (
+          currentStep !== "analysis" &&
+          currentStep !== "daily-prompts" &&
+          currentStep !== "topics" && (
             <div className="px-8 lg:px-16 xl:px-24 py-6 max-w-xl mx-auto w-full flex items-center justify-between">
               <button
                 onClick={goBack}
@@ -1538,27 +1827,123 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Testimonial Card - show when not in analysis results */}
-        {!(currentStep === "analysis" && analysisResult && !isAnalyzing) && (
-          <div className="absolute bottom-20 right-8 left-8 bg-white rounded-2xl shadow-lg p-6 max-w-md ml-auto">
-            <p className="text-gray-900 mb-4">
-              &quot;After trying out a few AI SEO platforms, I hounded the team
-              at GEO Analytics for a license until they finally took the call.
-              Since then, our visibility has 4x&apos;d and it&apos;s a common
-              occurrence for a customer to tell me they found us via ChatGPT or
-              Perplexity.&quot;
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gray-200" />
-              <div>
-                <p className="font-medium text-gray-900 text-sm">
-                  Customer Name
+        {/* Daily Prompts Step - Show prompt preview and AI icons */}
+        {currentStep === "daily-prompts" && analysisResult && (
+          <div className="absolute inset-8 flex flex-col justify-center items-center">
+            {/* Prompt bubble */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 max-w-sm mb-6">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="text-gray-600"
+                  >
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                </div>
+                <p className="text-gray-900 text-sm">
+                  Who is the leading company in{" "}
+                  {analysisResult.industry.toLowerCase()}?
                 </p>
-                <p className="text-gray-500 text-sm">CEO and Co-Founder</p>
+              </div>
+            </div>
+
+            {/* AI Model Icons with + more */}
+            <div className="flex items-center gap-2 mb-6">
+              <AIModelIcons />
+              <span className="text-sm text-gray-500">+ more</span>
+            </div>
+
+            {/* Running prompts indicator */}
+            <div className="bg-white rounded-xl shadow-lg px-6 py-4 flex items-center gap-3">
+              <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+              <span className="text-gray-700 font-medium">
+                Running prompts...
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Topics Step - Show Topic Selection Tips */}
+        {currentStep === "topics" && (
+          <div className="absolute bottom-20 right-8 left-8 bg-white rounded-2xl shadow-lg p-6 max-w-md ml-auto">
+            <h3 className="text-center font-semibold text-gray-900 mb-6">
+              Topic Selection Tips
+            </h3>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-5 h-5 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Check className="w-3 h-3 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">
+                    Each topic generates 5 prompts to track
+                  </p>
+                  <p className="text-gray-500 text-sm">
+                    We&apos;ll start you off with 5 topics and 25 prompts total
+                    — you can always add more later.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-5 h-5 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Check className="w-3 h-3 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">
+                    Try using keywords from traditional search tools
+                  </p>
+                  <p className="text-gray-500 text-sm">
+                    Pick common words or phrases that represent key parts of
+                    your brand, or that you use for your SEO.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-5 h-5 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Check className="w-3 h-3 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">
+                    Avoid long phrases
+                  </p>
+                  <p className="text-gray-500 text-sm">
+                    Remember these are topics not prompts! Keep them short.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* Testimonial Card - show when not in analysis results or new steps */}
+        {!(currentStep === "analysis" && analysisResult && !isAnalyzing) &&
+          currentStep !== "daily-prompts" &&
+          currentStep !== "topics" && (
+            <div className="absolute bottom-20 right-8 left-8 bg-white rounded-2xl shadow-lg p-6 max-w-md ml-auto">
+              <p className="text-gray-900 mb-4">
+                &quot;After trying out a few AI SEO platforms, I hounded the
+                team at GEO Analytics for a license until they finally took the
+                call. Since then, our visibility has 4x&apos;d and it&apos;s a
+                common occurrence for a customer to tell me they found us via
+                ChatGPT or Perplexity.&quot;
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gray-200" />
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">
+                    Customer Name
+                  </p>
+                  <p className="text-gray-500 text-sm">CEO and Co-Founder</p>
+                </div>
+              </div>
+            </div>
+          )}
       </div>
     </div>
   );

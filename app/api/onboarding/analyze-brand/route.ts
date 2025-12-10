@@ -9,11 +9,17 @@ import {
   type ExtractedBrand,
 } from "@/lib/llm";
 
+interface TopicSuggestion {
+  name: string;
+  description: string;
+}
+
 interface BrandAnalysis {
   brandName: string;
   industry: string;
   description: string;
   prompts: string[];
+  topics: TopicSuggestion[];
 }
 
 interface CompetitorRanking {
@@ -31,6 +37,7 @@ export interface OnboardingAnalysisResult {
   competitors: CompetitorRanking[];
   totalMentions: number;
   totalPrompts: number;
+  topics: TopicSuggestion[];
 }
 
 /**
@@ -48,13 +55,21 @@ async function analyzeWebsite(domain: string): Promise<BrandAnalysis | null> {
 2. What industry or product category they operate in (e.g., "Musical Instruments", "Scheduling Software", "E-commerce Platform")
 3. A brief description of what they do and who they serve
 
-Then generate 5 prompts that a curious user might ask an AI assistant about that industry (NOT about the brand itself). These prompts should:
+Then generate:
+
+A) 5 prompts that a curious user might ask an AI assistant about that industry (NOT about the brand itself). These prompts should:
 - Be from the perspective of someone researching or shopping in that space
 - Have natural, human-like phrasing - occasionally include slight imprecision or casual wording
 - Cover different intents: recommendations, comparisons, how-to questions, best options
 
-IMPORTANT: Return ONLY valid JSON in this exact format, no markdown or explanations:
-{"brandName": "Example Corp", "industry": "Category Name", "description": "Brief description", "prompts": ["prompt 1", "prompt 2", "prompt 3", "prompt 4", "prompt 5"]}`;
+B) 10 topics (short phrases, 2-5 words each) that represent what people search for when looking for this type of product/service. These should:
+- Be focused on what the business offers or problems they solve
+- Be relevant to how people actually search in AI assistants like ChatGPT
+- Include a brief description of each topic
+
+IMPORTANT: Return ONLY valid JSON in this exact format, no markdown, reasoning, or explanations:
+DO NOT UNDER ANY CIRCUMSTANCES RETURN ANYTHING OTHER THAN THE JSON OBJECT.
+{"brandName": "Example Corp", "industry": "Category Name", "description": "Brief description", "prompts": ["prompt 1", "prompt 2", "prompt 3", "prompt 4", "prompt 5"], "topics": [{"name": "Topic Name", "description": "Brief description of what this topic covers"}, ...]}`;
 
   try {
     const response = await fetch(
@@ -72,8 +87,9 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no markdown or explanati
             { role: "system", content: systemPrompt },
             { role: "user", content: `https://${domain}` },
           ],
+          response_format: { type: "json_object" },
           temperature: 0.7,
-          max_completion_tokens: 1024,
+          max_completion_tokens: 2048,
           compound_custom: {
             tools: {
               enabled_tools: ["visit_website"],
@@ -120,6 +136,24 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no markdown or explanati
 
       // Ensure we have exactly 5 prompts
       analysis.prompts = analysis.prompts.slice(0, 5);
+
+      // Validate and normalize topics
+      if (!analysis.topics || !Array.isArray(analysis.topics)) {
+        analysis.topics = [];
+      } else {
+        analysis.topics = analysis.topics
+          .filter(
+            (t) =>
+              typeof t.name === "string" &&
+              t.name.length > 0 &&
+              t.name.length <= 100
+          )
+          .slice(0, 10)
+          .map((t) => ({
+            name: t.name,
+            description: t.description || "",
+          }));
+      }
 
       return analysis;
     } catch {
@@ -331,6 +365,7 @@ export async function POST(request: NextRequest) {
       competitors,
       totalMentions: brandMentionCount,
       totalPrompts,
+      topics: brandAnalysis.topics,
     };
 
     console.log(
