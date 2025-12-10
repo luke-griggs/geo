@@ -33,21 +33,51 @@ export interface RunResult {
  */
 function analyzeResponseForMentions(
   responseText: string,
-  domainName: string
+  domainUrl: string,
+  brandName?: string | null
 ): {
   mentioned: boolean;
   position: number | null;
   contextSnippet: string | null;
 } {
   const lowerResponse = responseText.toLowerCase();
-  const lowerDomain = domainName.toLowerCase();
+  // Remove www. prefix for consistent matching
+  const lowerDomain = domainUrl.toLowerCase().replace(/^www\./, "");
 
-  // Check for domain mention (with or without www)
-  const domainVariants = [
+  // Build list of variants to check
+  const domainVariants: string[] = [
     lowerDomain,
     `www.${lowerDomain}`,
-    lowerDomain.replace("www.", ""),
   ];
+
+  // Also check for the brand name (e.g., "Fairlife" instead of just "fairlife.com")
+  if (brandName) {
+    const lowerBrandName = brandName.toLowerCase();
+    // Add the brand name if it's different from the domain
+    if (!domainVariants.includes(lowerBrandName)) {
+      domainVariants.push(lowerBrandName);
+    }
+  }
+
+  // Also try the domain without TLD (e.g., "fairlife" from "fairlife.com")
+  // This extracts the main brand name from domains like "fairlife.com" or "shop.fairlife.com"
+  const domainParts = lowerDomain.split(".");
+  // Get the main domain name (second-to-last part for subdomains, or first part for simple domains)
+  const domainWithoutTld = domainParts.length > 2 
+    ? domainParts[domainParts.length - 2]  // e.g., "shop.fairlife.com" -> "fairlife"
+    : domainParts[0];  // e.g., "fairlife.com" -> "fairlife"
+  
+  if (
+    domainWithoutTld &&
+    domainWithoutTld.length > 2 &&
+    !domainVariants.includes(domainWithoutTld)
+  ) {
+    domainVariants.push(domainWithoutTld);
+  }
+
+  // Debug logging
+  console.log(`[analyzeResponseForMentions] Domain: ${domainUrl}, Brand: ${brandName || 'NULL'}, Variants: ${domainVariants.join(', ')}`);
+  console.log(`[analyzeResponseForMentions] Response preview: ${responseText.slice(0, 200)}...`);
 
   let mentioned = false;
   let position: number | null = null;
@@ -57,6 +87,7 @@ function analyzeResponseForMentions(
     const index = lowerResponse.indexOf(variant);
     if (index !== -1) {
       mentioned = true;
+      console.log(`[analyzeResponseForMentions] ✓ Found match for variant: "${variant}" at index ${index}`);
 
       // Calculate rough position (1st, 2nd, etc. in the list)
       // This counts how many sentences/lines come before this mention
@@ -73,6 +104,10 @@ function analyzeResponseForMentions(
 
       break;
     }
+  }
+
+  if (!mentioned) {
+    console.log(`[analyzeResponseForMentions] ✗ No match found for any variant`);
   }
 
   return { mentioned, position, contextSnippet };
@@ -179,7 +214,8 @@ export async function runPromptsForDomain(
       // Analyze for mentions
       const analysis = analyzeResponseForMentions(
         response.text,
-        domainRecord.domain
+        domainRecord.domain,
+        domainRecord.name
       );
 
       // Store mention analysis
@@ -293,7 +329,8 @@ export async function runSinglePrompt(
     // Analyze for mentions
     const analysis = analyzeResponseForMentions(
       response.text,
-      promptRecord.domain.domain
+      promptRecord.domain.domain,
+      promptRecord.domain.name
     );
 
     // Store mention analysis
@@ -382,8 +419,9 @@ export async function runAllPrompts(
  */
 async function runSinglePromptSafe(
   p: { id: string; promptText: string },
-  domainName: string,
+  domainUrl: string,
   domainId: string,
+  brandName: string | null,
   provider: LLMProvider = "chatgpt"
 ): Promise<RunResult> {
   const promptRunId = generateId();
@@ -429,7 +467,11 @@ async function runSinglePromptSafe(
     });
 
     // Analyze for mentions
-    const analysis = analyzeResponseForMentions(response.text, domainName);
+    const analysis = analyzeResponseForMentions(
+      response.text,
+      domainUrl,
+      brandName
+    );
 
     // Store mention analysis
     await db.insert(mentionAnalysis).values({
@@ -491,7 +533,7 @@ export async function runPromptsInParallel(
   });
 
   console.log(
-    `Running ${activePrompts.length} prompts in parallel (concurrency: ${concurrency}) for domain ${domainRecord.domain}`
+    `Running ${activePrompts.length} prompts in parallel (concurrency: ${concurrency}) for domain ${domainRecord.domain}, brandName: ${domainRecord.name || 'NULL'}`
   );
 
   let completedCount = 0;
@@ -503,7 +545,13 @@ export async function runPromptsInParallel(
     // Run batch in parallel
     const batchResults = await Promise.all(
       batch.map((p) =>
-        runSinglePromptSafe(p, domainRecord.domain, domainId, provider)
+        runSinglePromptSafe(
+          p,
+          domainRecord.domain,
+          domainId,
+          domainRecord.name,
+          provider
+        )
       )
     );
 

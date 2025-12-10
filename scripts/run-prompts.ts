@@ -40,20 +40,40 @@ function generateId(): string {
 
 function analyzeResponseForMentions(
   responseText: string,
-  domainName: string
+  domainUrl: string,
+  brandName?: string | null
 ): {
   mentioned: boolean;
   position: number | null;
   contextSnippet: string | null;
 } {
   const lowerResponse = responseText.toLowerCase();
-  const lowerDomain = domainName.toLowerCase();
+  const lowerDomain = domainUrl.toLowerCase();
 
-  const domainVariants = [
+  // Build list of variants to check
+  const domainVariants: string[] = [
     lowerDomain,
     `www.${lowerDomain}`,
     lowerDomain.replace("www.", ""),
   ];
+
+  // Also check for the brand name (e.g., "Fairlife" instead of just "fairlife.com")
+  if (brandName) {
+    const lowerBrandName = brandName.toLowerCase();
+    if (!domainVariants.includes(lowerBrandName)) {
+      domainVariants.push(lowerBrandName);
+    }
+  }
+
+  // Also try the domain without TLD (e.g., "fairlife" from "fairlife.com")
+  const domainWithoutTld = lowerDomain.split(".")[0];
+  if (
+    domainWithoutTld &&
+    domainWithoutTld.length > 2 &&
+    !domainVariants.includes(domainWithoutTld)
+  ) {
+    domainVariants.push(domainWithoutTld);
+  }
 
   let mentioned = false;
   let position: number | null = null;
@@ -102,7 +122,9 @@ async function runPromptsForDomain(domainId: string): Promise<RunResult[]> {
 
   for (let i = 0; i < activePrompts.length; i++) {
     const p = activePrompts[i];
-    const providers: LLMProvider[] = (p.selectedProviders as LLMProvider[]) || ["chatgpt"];
+    const providers: LLMProvider[] = (p.selectedProviders as LLMProvider[]) || [
+      "chatgpt",
+    ];
 
     console.log(
       `\n  [${i + 1}/${activePrompts.length}] "${p.promptText.slice(0, 50)}..."`
@@ -146,7 +168,8 @@ async function runPromptsForDomain(domainId: string): Promise<RunResult[]> {
 
         const analysis = analyzeResponseForMentions(
           response.text,
-          domainRecord.domain
+          domainRecord.domain,
+          domainRecord.name
         );
 
         await db.insert(schema.mentionAnalysis).values({
@@ -161,7 +184,9 @@ async function runPromptsForDomain(domainId: string): Promise<RunResult[]> {
         const mentionStatus = analysis.mentioned
           ? "✅ Mentioned"
           : "⬜ Not mentioned";
-        console.log(`    [${provider}] ${mentionStatus} (${response.durationMs}ms)`);
+        console.log(
+          `    [${provider}] ${mentionStatus} (${response.durationMs}ms)`
+        );
 
         return {
           promptId: p.id,
@@ -173,7 +198,9 @@ async function runPromptsForDomain(domainId: string): Promise<RunResult[]> {
         };
       } catch (error) {
         console.log(
-          `    [${provider}] ❌ Error: ${error instanceof Error ? error.message : "Unknown"}`
+          `    [${provider}] ❌ Error: ${
+            error instanceof Error ? error.message : "Unknown"
+          }`
         );
         return {
           promptId: p.id,

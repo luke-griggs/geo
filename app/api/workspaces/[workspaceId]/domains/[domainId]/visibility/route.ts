@@ -123,31 +123,100 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       ),
     });
 
+    // Get brand mentions for industry ranking (fetch early to use for visibility calculation)
+    let brandMentions = await db.query.brandMention.findMany({
+      where: inArray(brandMention.promptRunId, promptRunIds),
+    });
+
+    // Get the user's brand name variants for matching
+    const userBrandName = (
+      domainRecord.name || domainRecord.domain
+    ).toLowerCase();
+    const userDomainBase = domainRecord.domain
+      .toLowerCase()
+      .replace(/^www\./, "")
+      .split(".")[0];
+
+    // Find brand mentions that match the user's brand (Groq extraction)
+    const userBrandMentions = brandMentions.filter((bm) => {
+      const bmNameLower = bm.brandName.toLowerCase();
+      const bmDomainLower =
+        bm.brandDomain
+          ?.toLowerCase()
+          .replace(/^www\./, "")
+          .split(".")[0] || "";
+      return (
+        bmNameLower === userBrandName ||
+        bmNameLower === userDomainBase ||
+        bmDomainLower === userDomainBase
+      );
+    });
+
+    // Get unique prompt run IDs where user's brand was mentioned (from Groq)
+    const groqMentionedRunIds = new Set(
+      userBrandMentions.map((bm) => bm.promptRunId)
+    );
+
     // Calculate overall visibility score
+    // Use the better of: mentionAnalysis OR Groq brand extraction
     const totalRuns = runs.length;
-    const mentionedRuns = mentions.filter((m) => m.mentioned).length;
+    const mentionedRunsFromAnalysis = mentions.filter(
+      (m) => m.mentioned
+    ).length;
+    const mentionedRunsFromGroq = groqMentionedRunIds.size;
+
+    // Use Groq data if it found more mentions (Groq is more accurate)
+    const mentionedRuns = Math.max(
+      mentionedRunsFromAnalysis,
+      mentionedRunsFromGroq
+    );
     const visibilityScore =
       totalRuns > 0 ? Math.round((mentionedRuns / totalRuns) * 1000) / 10 : 0;
 
     // Calculate chart data (daily visibility scores)
-    const dailyData: Record<string, { total: number; mentioned: number }> = {};
+    // Merge data from both mentionAnalysis and Groq extraction
+    const dailyData: Record<
+      string,
+      { total: number; mentioned: number; mentionedRunIds: Set<string> }
+    > = {};
 
     for (const run of runs) {
       const dateKey = run.executedAt.toISOString().split("T")[0];
       if (!dailyData[dateKey]) {
-        dailyData[dateKey] = { total: 0, mentioned: 0 };
+        dailyData[dateKey] = {
+          total: 0,
+          mentioned: 0,
+          mentionedRunIds: new Set(),
+        };
       }
       dailyData[dateKey].total++;
     }
 
+    // Add mentions from mentionAnalysis
     for (const mention of mentions) {
       const run = runs.find((r) => r.id === mention.promptRunId);
       if (run && mention.mentioned) {
         const dateKey = run.executedAt.toISOString().split("T")[0];
         if (dailyData[dateKey]) {
-          dailyData[dateKey].mentioned++;
+          dailyData[dateKey].mentionedRunIds.add(run.id);
         }
       }
+    }
+
+    // Add mentions from Groq extraction
+    for (const runId of groqMentionedRunIds) {
+      const run = runs.find((r) => r.id === runId);
+      if (run) {
+        const dateKey = run.executedAt.toISOString().split("T")[0];
+        if (dailyData[dateKey]) {
+          dailyData[dateKey].mentionedRunIds.add(run.id);
+        }
+      }
+    }
+
+    // Calculate final mentioned counts
+    for (const dateKey of Object.keys(dailyData)) {
+      dailyData[dateKey].mentioned = dailyData[dateKey].mentionedRunIds.size;
     }
 
     const chartData = Object.entries(dailyData)
@@ -159,11 +228,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             : 0,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
-
-    // Get brand mentions for industry ranking
-    let brandMentions = await db.query.brandMention.findMany({
-      where: inArray(brandMention.promptRunId, promptRunIds),
-    });
 
     // Filter by selected brands if specified
     if (selectedBrands && selectedBrands.length > 0) {
@@ -202,21 +266,48 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       brandAggregates[key].promptRunIds.add(bm.promptRunId);
     }
 
-    // Also add the user's domain to the ranking
+    // Get the user's brand name and domain variants for matching
+    const domainName = domainRecord.name || domainRecord.domain;
     const userDomainKey = domainRecord.domain
       .toLowerCase()
       .replace(/^www\./, "");
-    const domainName = domainRecord.name || domainRecord.domain;
-    brandAggregates[userDomainKey] = {
-      name: domainName,
-      mentionCount: mentionedRuns,
-      positions: mentions
-        .filter((m) => m.mentioned && m.position)
-        .map((m) => m.position!),
-      promptRunIds: new Set(
-        mentions.filter((m) => m.mentioned).map((m) => m.promptRunId)
-      ),
-    };
+
+    // Extract the base name from the domain (e.g., "fairlife" from "fairlife.com")
+    const domainBaseName = userDomainKey.split(".")[0].toLowerCase();
+    const brandNameLower = domainName.toLowerCase();
+
+    // Check if any Groq-extracted brand matches the user's brand
+    // If so, merge the data (use Groq's mention count instead of mentionAnalysis)
+    const matchingBrandKey = Object.keys(brandAggregates).find(
+      (key) =>
+        key === brandNameLower ||
+        key === domainBaseName ||
+        brandAggregates[key].name.toLowerCase() === brandNameLower ||
+        brandAggregates[key].name.toLowerCase() === domainBaseName
+    );
+
+    if (matchingBrandKey) {
+      // Found a matching brand from Groq - mark it as user's domain
+      // Keep the Groq data but update the key to be consistent
+      const existingData = brandAggregates[matchingBrandKey];
+      delete brandAggregates[matchingBrandKey];
+      brandAggregates[userDomainKey] = {
+        ...existingData,
+        name: domainName, // Use the user's preferred brand name
+      };
+    } else {
+      // No matching brand found from Groq - add user's domain with mentionAnalysis data
+      brandAggregates[userDomainKey] = {
+        name: domainName,
+        mentionCount: mentionedRuns,
+        positions: mentions
+          .filter((m) => m.mentioned && m.position)
+          .map((m) => m.position!),
+        promptRunIds: new Set(
+          mentions.filter((m) => m.mentioned).map((m) => m.promptRunId)
+        ),
+      };
+    }
 
     // Calculate industry ranking
     const industryRanking = Object.values(brandAggregates)
@@ -234,13 +325,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             ? Math.round((brand.promptRunIds.size / totalRuns) * 1000) / 10
             : 0;
 
+        // Case-insensitive comparison for isUserDomain
+        const isUserDomain =
+          brand.name.toLowerCase() === brandNameLower ||
+          brand.name.toLowerCase() === domainBaseName;
+
         return {
           brand: brand.name,
           mentions: brand.mentionCount,
           position: avgPosition,
           change: 0, // TODO: Calculate vs previous period
           visibility,
-          isUserDomain: brand.name === domainName,
+          isUserDomain,
         };
       })
       .sort((a, b) => b.visibility - a.visibility)

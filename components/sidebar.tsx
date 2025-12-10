@@ -16,6 +16,7 @@ import {
   Check,
   Search,
   LayoutDashboard,
+  PenSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -36,7 +37,12 @@ import { useSession, signOut } from "@/lib/auth-client";
 import { AccountSettingsModal } from "@/components/account-settings-modal";
 import { AddDomainModal } from "@/components/add-domain-modal";
 
-type NavSection = "overview" | "prompts" | "visibility" | "mentions";
+type NavSection =
+  | "overview"
+  | "prompts"
+  | "visibility"
+  | "mentions"
+  | "content";
 
 interface Domain {
   id: string;
@@ -49,6 +55,7 @@ const navItems = [
   { id: "visibility" as const, label: "Visibility", icon: Eye },
   { id: "mentions" as const, label: "Mentions", icon: AtSign },
   { id: "prompts" as const, label: "Prompts", icon: FileText },
+  { id: "content" as const, label: "Content", icon: PenSquare },
 ];
 
 function getInitials(name?: string | null) {

@@ -7,6 +7,7 @@ import { OverviewSection } from "@/components/sections/overview-section";
 import { PromptsSection } from "@/components/sections/prompts-section";
 import { VisibilitySection } from "@/components/sections/visibility-section";
 import { MentionsSection } from "@/components/sections/mentions-section";
+import { ContentSection } from "@/components/sections/content-section";
 import { Loader2 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 
@@ -34,7 +35,9 @@ function DashboardContent() {
 
   const activeSection: NavSection =
     sectionParam &&
-    ["overview", "prompts", "visibility", "mentions"].includes(sectionParam)
+    ["overview", "prompts", "visibility", "mentions", "content"].includes(
+      sectionParam
+    )
       ? (sectionParam as NavSection)
       : "overview";
 
@@ -196,6 +199,13 @@ function DashboardContent() {
           )}
           {activeSection === "mentions" && (
             <MentionsSection
+              workspaceId={workspace.id}
+              domainId={domain.id}
+              domainName={domain.domain}
+            />
+          )}
+          {activeSection === "content" && (
+            <ContentSection
               workspaceId={workspace.id}
               domainId={domain.id}
               domainName={domain.domain}

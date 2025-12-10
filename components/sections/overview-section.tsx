@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Loader2,
   FileText,
@@ -19,6 +20,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import type { NavSection } from "@/components/sidebar";
+import { useState } from "react";
 
 interface OverviewSectionProps {
   workspaceId: string;
@@ -58,6 +60,68 @@ interface RunStatus {
   status: "pending" | "running" | "completed";
   progress: number;
   total: number;
+}
+
+// Fetch functions
+async function fetchRunStatus(
+  workspaceId: string,
+  domainId: string
+): Promise<RunStatus> {
+  const res = await fetch(
+    `/api/workspaces/${workspaceId}/domains/${domainId}/run-status`
+  );
+  if (!res.ok) {
+    throw new Error("Failed to fetch run status");
+  }
+  return res.json();
+}
+
+async function fetchOverviewData(
+  workspaceId: string,
+  domainId: string,
+  startDate: string,
+  endDate: string
+): Promise<OverviewData> {
+  const params = new URLSearchParams({ startDate, endDate });
+
+  // Fetch visibility data
+  const visibilityRes = await fetch(
+    `/api/workspaces/${workspaceId}/domains/${domainId}/visibility?${params}`
+  );
+
+  if (!visibilityRes.ok) {
+    throw new Error("Failed to fetch visibility data");
+  }
+
+  const visibilityData = await visibilityRes.json();
+
+  // Fetch platform breakdown (model performance)
+  const modelRes = await fetch(
+    `/api/workspaces/${workspaceId}/domains/${domainId}/model-performance?${params}`
+  );
+
+  let platformBreakdown: PlatformVisibility[] = [];
+  if (modelRes.ok) {
+    const modelData = await modelRes.json();
+    platformBreakdown = (modelData.models || []).map(
+      (m: ModelPerformanceItem) => ({
+        platform: m.provider,
+        visibility: m.visibilityRate,
+        icon: m.provider,
+      })
+    );
+  }
+
+  // For now, topic performance is placeholder until we add topics
+  const topicPerformance: TopicPerformance[] = [];
+
+  return {
+    visibilityScore: visibilityData.visibilityScore || 0,
+    totalPrompts: visibilityData.totalPrompts || 0,
+    totalMentions: visibilityData.totalMentions || 0,
+    platformBreakdown,
+    topicPerformance,
+  };
 }
 
 // Dotted background pattern component
@@ -125,15 +189,7 @@ export function OverviewSection({
   domainName,
   onNavigate,
 }: OverviewSectionProps) {
-  const [data, setData] = useState<OverviewData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [chartMode, setChartMode] = useState<"bar" | "line">("bar");
-
-  // Prompt run status
-  const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Calculate date range (last 7 days)
   const dateRange = useMemo(() => {
@@ -145,122 +201,57 @@ export function OverviewSection({
     };
   }, []);
 
-  // Check prompt run status
-  const checkRunStatus = useCallback(async () => {
-    try {
-      const res = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/run-status`
-      );
-      if (res.ok) {
-        const status: RunStatus = await res.json();
-        setRunStatus(status);
-        return status;
+  // Query for run status with smart polling
+  // Polls every 2 seconds while status is pending/running, stops when completed
+  const { data: runStatus, isLoading: isStatusLoading } = useQuery({
+    queryKey: ["runStatus", workspaceId, domainId],
+    queryFn: () => fetchRunStatus(workspaceId, domainId),
+    // Poll every 2 seconds, but only if status is not completed
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      // Stop polling once completed
+      if (status === "completed") {
+        return false;
       }
-    } catch (err) {
-      console.error("Error checking run status:", err);
-    }
-    return null;
-  }, [workspaceId, domainId]);
+      // Keep polling while pending or running
+      return 2000;
+    },
+    // Refetch on mount to get fresh status
+    refetchOnMount: true,
+  });
 
-  // Fetch overview data
-  const fetchOverviewData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const isRunning =
+    runStatus?.status === "pending" || runStatus?.status === "running";
 
-    try {
-      const params = new URLSearchParams({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-      });
-
-      // Fetch visibility data
-      const visibilityRes = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/visibility?${params}`
-      );
-
-      if (!visibilityRes.ok) {
-        throw new Error("Failed to fetch visibility data");
-      }
-
-      const visibilityData = await visibilityRes.json();
-
-      // Fetch platform breakdown (model performance)
-      const modelRes = await fetch(
-        `/api/workspaces/${workspaceId}/domains/${domainId}/model-performance?${params}`
-      );
-
-      let platformBreakdown: PlatformVisibility[] = [];
-      if (modelRes.ok) {
-        const modelData = await modelRes.json();
-        platformBreakdown = (modelData.models || []).map(
-          (m: ModelPerformanceItem) => ({
-            platform: m.provider,
-            visibility: m.visibilityRate,
-            icon: m.provider,
-          })
-        );
-      }
-
-      // For now, topic performance is placeholder until we add topics
-      // In the future, this would come from a topics API
-      const topicPerformance: TopicPerformance[] = [];
-
-      setData({
-        visibilityScore: visibilityData.visibilityScore || 0,
-        totalPrompts: visibilityData.totalPrompts || 0,
-        totalMentions: visibilityData.totalMentions || 0,
-        platformBreakdown,
-        topicPerformance,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [workspaceId, domainId, dateRange]);
-
-  // Initial load: check status first, then decide what to show
-  useEffect(() => {
-    const init = async () => {
-      setIsCheckingStatus(true);
-      const status = await checkRunStatus();
-
-      if (
-        status &&
-        (status.status === "pending" || status.status === "running")
-      ) {
-        // Start polling for status updates
-        pollingIntervalRef.current = setInterval(async () => {
-          const newStatus = await checkRunStatus();
-          if (newStatus?.status === "completed") {
-            // Stop polling and load overview data
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current);
-              pollingIntervalRef.current = null;
-            }
-            fetchOverviewData();
-          }
-        }, 2000);
-      } else {
-        // Status is completed or null, just load overview data
-        fetchOverviewData();
-      }
-
-      setIsCheckingStatus(false);
-    };
-
-    init();
-
-    // Cleanup polling on unmount
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-    };
-  }, [checkRunStatus, fetchOverviewData]);
+  // Query for overview data - only fetch when prompts are complete
+  const {
+    data,
+    isLoading: isDataLoading,
+    error,
+    refetch: refetchOverview,
+  } = useQuery({
+    queryKey: [
+      "overview",
+      workspaceId,
+      domainId,
+      dateRange.startDate,
+      dateRange.endDate,
+    ],
+    queryFn: () =>
+      fetchOverviewData(
+        workspaceId,
+        domainId,
+        dateRange.startDate,
+        dateRange.endDate
+      ),
+    // Only fetch when status is completed or when we have no status info
+    enabled: !isRunning,
+    // Keep previous data while refetching
+    placeholderData: (previousData) => previousData,
+  });
 
   // Show initial loading while checking status
-  if (isCheckingStatus) {
+  if (isStatusLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-3">
@@ -272,10 +263,7 @@ export function OverviewSection({
   }
 
   // Show prompt run loading state if prompts are still running
-  if (
-    runStatus &&
-    (runStatus.status === "pending" || runStatus.status === "running")
-  ) {
+  if (isRunning && runStatus) {
     return (
       <TooltipProvider>
         <div className="flex flex-col pb-12">
@@ -293,7 +281,7 @@ export function OverviewSection({
     );
   }
 
-  if (isLoading) {
+  if (isDataLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-3">
@@ -308,9 +296,11 @@ export function OverviewSection({
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <p className="text-red-600 mb-2">{error}</p>
+          <p className="text-red-600 mb-2">
+            {error instanceof Error ? error.message : "Something went wrong"}
+          </p>
           <button
-            onClick={fetchOverviewData}
+            onClick={() => refetchOverview()}
             className="text-sm text-gray-600 hover:text-gray-900 underline"
           >
             Try again
