@@ -26,9 +26,9 @@ export function middleware(request: NextRequest) {
 
   // If user is not authenticated and trying to access protected route
   if (!isAuthenticated && !isPublicRoute && !pathname.startsWith("/api/")) {
-    const signInUrl = new URL("/sign-in", request.url);
-    signInUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(signInUrl);
+    const onboardingUrl = new URL("/onboarding", request.url);
+    onboardingUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(onboardingUrl);
   }
 
   // If user is authenticated and on auth pages, redirect to dashboard

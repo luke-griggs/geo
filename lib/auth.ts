@@ -48,6 +48,14 @@ export const auth = betterAuth({
         });
 
         console.log("[Auth] Resend result:", result);
+
+        // Throw error if Resend failed so better-auth propagates it to the client
+        if (result.error) {
+          console.error("[Auth] Resend error:", result.error);
+          throw new Error(
+            result.error.message || "Failed to send verification email"
+          );
+        }
       },
     }),
   ],

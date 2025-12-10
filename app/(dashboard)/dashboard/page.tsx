@@ -8,6 +8,7 @@ import { PromptsSection } from "@/components/sections/prompts-section";
 import { VisibilitySection } from "@/components/sections/visibility-section";
 import { MentionsSection } from "@/components/sections/mentions-section";
 import { Loader2 } from "lucide-react";
+import { signOut } from "@/lib/auth-client";
 
 interface Organization {
   id: string;
@@ -67,6 +68,14 @@ function DashboardContent() {
     async function fetchWorkspace() {
       try {
         const res = await fetch("/api/workspaces");
+
+        // Handle unauthorized - sign out and redirect to onboarding
+        if (res.status === 401) {
+          await signOut();
+          router.push("/onboarding");
+          return;
+        }
+
         if (!res.ok) {
           throw new Error("Failed to fetch workspaces");
         }

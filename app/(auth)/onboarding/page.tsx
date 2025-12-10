@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, Loader2, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { emailOtp, signIn } from "@/lib/auth-client";
+import { emailOtp, signIn, signUp } from "@/lib/auth-client";
 
 type OnboardingStep = "email" | "signin" | "company" | "account" | "verify";
 
@@ -144,11 +144,32 @@ export default function OnboardingPage() {
     setError(null);
 
     try {
+      // First, create the account with signUp.email
+      console.log("[Onboarding] Creating account for:", email);
+      const signUpResult = await signUp.email({
+        email,
+        password,
+        name: `${firstName} ${lastName}`,
+      });
+
+      console.log("[Onboarding] Sign up result:", signUpResult);
+
+      if (signUpResult.error) {
+        console.error("[Onboarding] Sign up error:", signUpResult.error);
+        setError(signUpResult.error.message || "Failed to create account");
+        setIsLoading(false);
+        return;
+      }
+
+      // Store first/last name separately for profile update later if needed
+      localStorage.setItem("onboarding_first_name", firstName);
+      localStorage.setItem("onboarding_last_name", lastName);
+
       // Now send the verification OTP
       console.log("[Onboarding] Sending verification OTP to:", email);
       const result = await emailOtp.sendVerificationOtp({
         email,
-        type: "sign-in",
+        type: "email-verification",
       });
 
       console.log("[Onboarding] OTP send result:", result);
@@ -165,7 +186,7 @@ export default function OnboardingPage() {
       setResendTimer(60);
       setCanResend(false);
     } catch (err) {
-      console.error("[Onboarding] OTP send exception:", err);
+      console.error("[Onboarding] Account creation exception:", err);
       setError("Failed to create account. Please try again.");
     } finally {
       setIsLoading(false);
@@ -227,16 +248,32 @@ export default function OnboardingPage() {
     setError(null);
 
     try {
-      // Sign in with OTP - this verifies the OTP and auto-creates user if needed
-      const result = await signIn.emailOtp({
+      // Verify the email with OTP
+      console.log("[Onboarding] Verifying email with OTP");
+      const verifyResult = await emailOtp.verifyEmail({
         email,
         otp: otpString,
       });
 
-      if (result.error) {
-        setError(result.error.message || "Invalid verification code");
+      if (verifyResult.error) {
+        console.error("[Onboarding] Email verification error:", verifyResult.error);
+        setError(verifyResult.error.message || "Invalid verification code");
         setIsLoading(false);
         return;
+      }
+
+      console.log("[Onboarding] Email verified, signing in");
+
+      // Email verified - now sign in with email/password
+      const signInResult = await signIn.email({
+        email,
+        password,
+      });
+
+      if (signInResult.error) {
+        console.error("[Onboarding] Sign in after verify error:", signInResult.error);
+        // Even if sign-in fails, the account is verified - try redirecting
+        // The user might already have a session from signUp
       }
 
       // Success - redirect to dashboard
@@ -245,7 +282,7 @@ export default function OnboardingPage() {
       setError("Failed to verify email");
       setIsLoading(false);
     }
-  }, [otp, email, router]);
+  }, [otp, email, password, router]);
 
   const handleResend = async () => {
     if (!canResend) return;
@@ -256,7 +293,7 @@ export default function OnboardingPage() {
     try {
       const result = await emailOtp.sendVerificationOtp({
         email,
-        type: "sign-in",
+        type: "email-verification",
       });
 
       if (result.error) {
