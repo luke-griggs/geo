@@ -49,7 +49,70 @@ type OnboardingStep =
   | "company"
   | "account"
   | "verify"
-  | "brand";
+  | "brand"
+  | "analysis";
+
+// Analysis result type matching the API response
+interface AnalysisResult {
+  brandName: string;
+  domain: string;
+  industry: string;
+  visibilityScore: number;
+  rank: number | null;
+  competitors: { name: string; domain: string | null; mentionCount: number }[];
+  totalMentions: number;
+  totalPrompts: number;
+}
+
+// AI Model icons component
+function AIModelIcons() {
+  return (
+    <div className="flex items-center gap-1">
+      {/* ChatGPT */}
+      <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.896zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"
+            fill="white"
+          />
+        </svg>
+      </div>
+      {/* Claude/Anthropic */}
+      <div className="w-8 h-8 rounded-full bg-[#D97757] flex items-center justify-center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+          <path d="M17.304 3.866l-6.836 16.268h3.478l6.836-16.268h-3.478zm-7.132 0L3.336 20.134h3.478l6.836-16.268h-3.478z" />
+        </svg>
+      </div>
+      {/* Google/Gemini */}
+      <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center">
+        <svg width="16" height="16" viewBox="0 0 24 24">
+          <path
+            fill="#4285F4"
+            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+          />
+          <path
+            fill="#34A853"
+            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+          />
+          <path
+            fill="#EA4335"
+            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+          />
+        </svg>
+      </div>
+      {/* Meta/Llama */}
+      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0081FB] via-[#A259FF] to-[#F77737] flex items-center justify-center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+          <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z" />
+        </svg>
+      </div>
+    </div>
+  );
+}
 
 const COMPANY_SIZES = [
   "1-10 employees",
@@ -84,6 +147,13 @@ export default function OnboardingPage() {
   const [brandDescription, setBrandDescription] = useState("");
   const [websiteError, setWebsiteError] = useState<string | null>(null);
   const [isValidatingDomain, setIsValidatingDomain] = useState(false);
+
+  // Analysis step data
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
+    null
+  );
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   // Clean website input to get favicon
   const cleanedWebsite = website
@@ -403,16 +473,51 @@ export default function OnboardingPage() {
       }
 
       // Store brand data for later use (when creating organization/domain)
-      localStorage.setItem("onboarding_website", result.domain || website);
+      const validatedDomain = result.domain || website;
+      localStorage.setItem("onboarding_website", validatedDomain);
       localStorage.setItem("onboarding_brand_description", brandDescription);
 
-      // Success - redirect to dashboard
-      router.push("/dashboard");
+      // Move to analysis step and start analyzing
+      setIsValidatingDomain(false);
+      goToStep("analysis", "right");
+      runBrandAnalysis(validatedDomain);
     } catch {
       setWebsiteError("Failed to validate domain. Please try again.");
-    } finally {
       setIsValidatingDomain(false);
     }
+  };
+
+  const runBrandAnalysis = async (domain: string) => {
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    setAnalysisResult(null);
+
+    try {
+      const response = await fetch("/api/onboarding/analyze-brand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        setAnalysisError(error.error || "Failed to analyze brand");
+        setIsAnalyzing(false);
+        return;
+      }
+
+      const result: AnalysisResult = await response.json();
+      setAnalysisResult(result);
+    } catch {
+      setAnalysisError("Failed to analyze brand. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleAnalysisContinue = () => {
+    // Redirect to dashboard
+    router.push("/dashboard");
   };
 
   const handleWrongAccount = async () => {
@@ -1132,13 +1237,136 @@ export default function OnboardingPage() {
                 </div>
               </motion.div>
             )}
+
+            {currentStep === "analysis" && (
+              <motion.div
+                key="analysis"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                className="flex flex-col h-full"
+              >
+                {isAnalyzing ? (
+                  // Loading state
+                  <div className="flex-1 flex flex-col items-center justify-center">
+                    <div className="relative mb-8">
+                      <div className="w-16 h-16 rounded-full border-4 border-gray-200 border-t-gray-900 animate-spin" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                      Analyzing your brand&apos;s AI visibility
+                    </h2>
+                    <p className="text-gray-500 text-center max-w-sm">
+                      We&apos;re checking how often AI assistants recommend your
+                      brand. This may take a minute...
+                    </p>
+                  </div>
+                ) : analysisError ? (
+                  // Error state
+                  <div className="flex-1">
+                    <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 mb-6">
+                      {analysisError}
+                    </div>
+                    <button
+                      onClick={() => runBrandAnalysis(cleanedWebsite)}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                    >
+                      Try Again
+                    </button>
+                    <button
+                      onClick={() => goToStep("brand", "left")}
+                      className="w-full mt-3 flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium rounded-lg transition-colors"
+                    >
+                      Go Back
+                    </button>
+                  </div>
+                ) : analysisResult ? (
+                  // Results state
+                  <div className="flex-1">
+                    {/* Brand header */}
+                    <div className="flex items-center gap-3 mb-6">
+                      <DomainLogo
+                        domain={analysisResult.domain}
+                        className="w-8 h-8"
+                      />
+                      <div>
+                        <span className="font-semibold text-gray-900">
+                          {analysisResult.brandName}
+                        </span>
+                        <span className="text-gray-500 ml-2">
+                          {analysisResult.domain}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* AI Model Icons */}
+                    <div className="mb-6">
+                      <AIModelIcons />
+                    </div>
+
+                    {/* Dynamic headline based on performance */}
+                    {analysisResult.rank !== null &&
+                    analysisResult.rank <= 3 ? (
+                      // Good visibility
+                      <>
+                        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+                          {analysisResult.brandName} is ranked #
+                          {analysisResult.rank} in AI visibility
+                        </h1>
+                        <p className="text-gray-500 mb-8">
+                          We&apos;ve identified 3+ strategies to move your brand
+                          up from rank #{analysisResult.rank} and gain more
+                          visibility.
+                        </p>
+                      </>
+                    ) : analysisResult.rank !== null &&
+                      analysisResult.rank <= 7 ? (
+                      // Moderate visibility
+                      <>
+                        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+                          {analysisResult.brandName} has moderate AI visibility
+                        </h1>
+                        <p className="text-gray-500 mb-8">
+                          You&apos;re currently ranked #{analysisResult.rank} —
+                          we&apos;ve found opportunities to improve your
+                          visibility.
+                        </p>
+                      </>
+                    ) : (
+                      // Poor visibility
+                      <>
+                        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+                          {analysisResult.brandName}&apos;s AI visibility is
+                          below industry benchmarks
+                        </h1>
+                        <p className="text-gray-500 mb-8">
+                          Let&apos;s fix that — we&apos;ve already found 5+
+                          opportunities to improve {analysisResult.brandName}
+                          &apos;s visibility.
+                        </p>
+                      </>
+                    )}
+
+                    <button
+                      onClick={handleAnalysisContinue}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                    >
+                      Continue
+                    </button>
+                  </div>
+                ) : null}
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 
         {/* Footer Navigation */}
         {currentStep !== "email" &&
           currentStep !== "signin" &&
-          currentStep !== "brand" && (
+          currentStep !== "brand" &&
+          currentStep !== "analysis" && (
             <div className="px-8 lg:px-16 xl:px-24 py-6 max-w-xl mx-auto w-full flex items-center justify-between">
               <button
                 onClick={goBack}
@@ -1213,23 +1441,124 @@ export default function OnboardingPage() {
           </svg>
         </div>
 
-        {/* Testimonial Card Placeholder */}
-        <div className="absolute bottom-20 right-8 left-8 bg-white rounded-2xl shadow-lg p-6 max-w-md ml-auto">
-          <p className="text-gray-900 mb-4">
-            &quot;After trying out a few AI SEO platforms, I hounded the team at
-            GEO Analytics for a license until they finally took the call. Since
-            then, our visibility has 4x&apos;d and it&apos;s a common occurrence
-            for a customer to tell me they found us via ChatGPT or
-            Perplexity.&quot;
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-200" />
-            <div>
-              <p className="font-medium text-gray-900 text-sm">Customer Name</p>
-              <p className="text-gray-500 text-sm">CEO and Co-Founder</p>
+        {/* Show Industry Ranking Card when analysis results are available */}
+        {currentStep === "analysis" && analysisResult && !isAnalyzing && (
+          <div className="absolute bottom-20 right-8 left-8 bg-white rounded-2xl shadow-lg p-6 max-w-md ml-auto">
+            <h3 className="text-center font-semibold text-gray-900 mb-4">
+              {analysisResult.industry}
+            </h3>
+            <div className="space-y-2">
+              {/* Show competitors with our brand - always show 5 items total */}
+              {(() => {
+                type RankingItem = {
+                  rank: number;
+                  name: string;
+                  domain: string | null;
+                  isOurBrand: boolean;
+                };
+
+                const userRank = analysisResult.rank;
+                const userBrandEntry: RankingItem = {
+                  rank: userRank ?? 999,
+                  name: analysisResult.brandName,
+                  domain: analysisResult.domain,
+                  isOurBrand: true,
+                };
+
+                // If user is in top 4, show positions 1-5 with user inserted
+                // If user is ranked 5+, show positions 1-4 then user at their rank
+                const displayItems: RankingItem[] = [];
+
+                if (userRank !== null && userRank <= 4) {
+                  // User is in top 4, fill in around them
+                  let competitorIdx = 0;
+                  for (let position = 1; position <= 5; position++) {
+                    if (position === userRank) {
+                      displayItems.push(userBrandEntry);
+                    } else if (
+                      competitorIdx < analysisResult.competitors.length
+                    ) {
+                      displayItems.push({
+                        rank: position,
+                        name: analysisResult.competitors[competitorIdx].name,
+                        domain:
+                          analysisResult.competitors[competitorIdx].domain,
+                        isOurBrand: false,
+                      });
+                      competitorIdx++;
+                    }
+                  }
+                } else {
+                  // User is ranked 5+ (or unranked), show top 4 competitors then user
+                  for (
+                    let i = 0;
+                    i < Math.min(4, analysisResult.competitors.length);
+                    i++
+                  ) {
+                    displayItems.push({
+                      rank: i + 1,
+                      name: analysisResult.competitors[i].name,
+                      domain: analysisResult.competitors[i].domain,
+                      isOurBrand: false,
+                    });
+                  }
+                  displayItems.push(userBrandEntry);
+                }
+
+                return displayItems.map((item, idx) => (
+                  <div
+                    key={`${item.name}-${idx}`}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                      item.isOurBrand
+                        ? "bg-gray-100 border border-gray-200"
+                        : "hover:bg-gray-50"
+                    )}
+                  >
+                    <span className="text-sm font-medium text-gray-500 w-6">
+                      #{item.rank}
+                    </span>
+                    {item.domain && (
+                      <DomainLogo domain={item.domain} className="w-5 h-5" />
+                    )}
+                    <span
+                      className={cn(
+                        "text-sm",
+                        item.isOurBrand
+                          ? "font-semibold text-gray-900"
+                          : "text-gray-700"
+                      )}
+                    >
+                      {item.name}
+                    </span>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Testimonial Card - show when not in analysis results */}
+        {!(currentStep === "analysis" && analysisResult && !isAnalyzing) && (
+          <div className="absolute bottom-20 right-8 left-8 bg-white rounded-2xl shadow-lg p-6 max-w-md ml-auto">
+            <p className="text-gray-900 mb-4">
+              &quot;After trying out a few AI SEO platforms, I hounded the team
+              at GEO Analytics for a license until they finally took the call.
+              Since then, our visibility has 4x&apos;d and it&apos;s a common
+              occurrence for a customer to tell me they found us via ChatGPT or
+              Perplexity.&quot;
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gray-200" />
+              <div>
+                <p className="font-medium text-gray-900 text-sm">
+                  Customer Name
+                </p>
+                <p className="text-gray-500 text-sm">CEO and Co-Founder</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
