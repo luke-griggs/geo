@@ -36,6 +36,12 @@ export const memberRoleEnum = pgEnum("member_role", [
   "member",
 ]);
 
+export const promptRunStatusEnum = pgEnum("prompt_run_status", [
+  "pending",
+  "running",
+  "completed",
+]);
+
 // ============================================
 // Auth Tables (Better Auth)
 // ============================================
@@ -182,6 +188,10 @@ export const domain = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     verified: boolean("verified").default(false).notNull(),
+    promptRunStatus:
+      promptRunStatusEnum("prompt_run_status").default("pending"),
+    promptRunProgress: integer("prompt_run_progress").default(0), // Number of prompts completed
+    promptRunTotal: integer("prompt_run_total").default(0), // Total prompts to run
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

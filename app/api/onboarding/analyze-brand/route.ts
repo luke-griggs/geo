@@ -41,7 +41,7 @@ export interface OnboardingAnalysisResult {
 }
 
 /**
- * Analyze a website using Groq's compound model with visit_website tool
+ * Analyze a website using Groq's compound with visit_website tool
  */
 async function analyzeWebsite(domain: string): Promise<BrandAnalysis | null> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -57,10 +57,15 @@ async function analyzeWebsite(domain: string): Promise<BrandAnalysis | null> {
 
 Then generate:
 
-A) 5 prompts that a curious user might ask an AI assistant about that industry (NOT about the brand itself). These prompts should:
-- Be from the perspective of someone researching or shopping in that space
-- Have natural, human-like phrasing - occasionally include slight imprecision or casual wording
+A) 5 questions that user might ask about that product category **NOT about the brand itself** These prompts should:
+- Have natural, HUMAN-LIKE phrasing. occasionally include slight imprecision or casual wording
+- These prompts should have absolutely zero resemblance to ai generated text. No, em-dashes
 - Cover different intents: recommendations, comparisons, how-to questions, best options
+
+for example, if the website visited is fender.com, the prompts generated would look like 
+
+"what are some good guitars for beginners"
+"give me some recommendations for bass amps"
 
 B) 10 topics (short phrases, 2-5 words each) that represent what people search for when looking for this type of product/service. These should:
 - Be focused on what the business offers or problems they solve
@@ -68,7 +73,11 @@ B) 10 topics (short phrases, 2-5 words each) that represent what people search f
 - Include a brief description of each topic
 
 IMPORTANT: Return ONLY valid JSON in this exact format, no markdown, reasoning, or explanations:
-DO NOT UNDER ANY CIRCUMSTANCES RETURN ANYTHING OTHER THAN THE JSON OBJECT.
+
+IMPORTANT: Only fetch from the provided domain
+
+Think carefully and deeply ponder the fact that I'm asking you to return only JSON in your final response. So while you're thinking, think about your output being JSON only. Do not output anything except for JSON. DO NOT output any paragraphs explaining what you're doing. DO  NOT give an overview. RETURN JSON. I want you to ponder this while you're thinking. It is important that your response only includes json in the form below
+
 {"brandName": "Example Corp", "industry": "Category Name", "description": "Brief description", "prompts": ["prompt 1", "prompt 2", "prompt 3", "prompt 4", "prompt 5"], "topics": [{"name": "Topic Name", "description": "Brief description of what this topic covers"}, ...]}`;
 
   try {
@@ -82,14 +91,14 @@ DO NOT UNDER ANY CIRCUMSTANCES RETURN ANYTHING OTHER THAN THE JSON OBJECT.
           "Groq-Model-Version": "latest",
         },
         body: JSON.stringify({
-          model: "groq/compound",
+          model: "groq/compound-mini",
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: `https://${domain}` },
+            { role: "user", content: `${domain}` },
           ],
           response_format: { type: "json_object" },
-          temperature: 0.7,
-          max_completion_tokens: 2048,
+          temperature: 1,
+          max_completion_tokens: 1024,
           compound_custom: {
             tools: {
               enabled_tools: ["visit_website"],
@@ -109,7 +118,7 @@ DO NOT UNDER ANY CIRCUMSTANCES RETURN ANYTHING OTHER THAN THE JSON OBJECT.
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      console.error("No content in Groq response");
+      console.error("No text content in Groq compound response:", data);
       return null;
     }
 

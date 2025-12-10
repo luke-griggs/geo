@@ -11,6 +11,12 @@ import {
   Plus,
   Check,
   X,
+  ChevronDown,
+  ChevronRight,
+  Trash2,
+  ExternalLink,
+  MoreHorizontal,
+  Pencil,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { emailOtp, signIn, signUp } from "@/lib/auth-client";
@@ -63,12 +69,28 @@ type OnboardingStep =
   | "brand"
   | "analysis"
   | "daily-prompts"
-  | "topics";
+  | "topics"
+  | "prompts";
 
 // Topic suggestion from the API
 interface TopicSuggestion {
   name: string;
   description: string;
+}
+
+// Generated prompt with unique ID
+interface GeneratedPrompt {
+  id: string;
+  text: string;
+  category: string;
+}
+
+// Topic with its generated prompts
+interface TopicWithPrompts {
+  name: string;
+  description: string;
+  prompts: GeneratedPrompt[];
+  isExpanded: boolean;
 }
 
 // Analysis result type matching the API response
@@ -195,6 +217,27 @@ export default function OnboardingPage() {
   const [customTopics, setCustomTopics] = useState<TopicSuggestion[]>([]);
   const [isAddingCustomTopic, setIsAddingCustomTopic] = useState(false);
   const [customTopicInput, setCustomTopicInput] = useState("");
+
+  // Prompts step data
+  const [topicsWithPrompts, setTopicsWithPrompts] = useState<
+    TopicWithPrompts[]
+  >([]);
+  const [isGeneratingPrompts, setIsGeneratingPrompts] = useState(false);
+  const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
+  const [editingPromptText, setEditingPromptText] = useState("");
+  const [addingPromptToTopic, setAddingPromptToTopic] = useState<string | null>(
+    null
+  );
+  const [newPromptText, setNewPromptText] = useState("");
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showAddPromptDropdown, setShowAddPromptDropdown] = useState(false);
+  const [isAddingNewTopic, setIsAddingNewTopic] = useState(false);
+  const [newTopicName, setNewTopicName] = useState("");
+  const [editingTopicName, setEditingTopicName] = useState<string | null>(null);
+  const [editingTopicNameText, setEditingTopicNameText] = useState("");
+  const [openTopicMenu, setOpenTopicMenu] = useState<string | null>(null);
+  const [isSubmittingPrompts, setIsSubmittingPrompts] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Clean website input to get favicon
   const cleanedWebsite = website
@@ -420,6 +463,60 @@ export default function OnboardingPage() {
     }
   };
 
+  const handleVerify = useCallback(
+    async (pastedOtp?: string) => {
+      const otpString = pastedOtp || otp.join("");
+      if (otpString.length !== 6) return;
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Verify the email with OTP
+        console.log("[Onboarding] Verifying email with OTP");
+        const verifyResult = await emailOtp.verifyEmail({
+          email,
+          otp: otpString,
+        });
+
+        if (verifyResult.error) {
+          console.error(
+            "[Onboarding] Email verification error:",
+            verifyResult.error
+          );
+          setError(verifyResult.error.message || "Invalid verification code");
+          setIsLoading(false);
+          return;
+        }
+
+        console.log("[Onboarding] Email verified, signing in");
+
+        // Email verified - now sign in with email/password
+        const signInResult = await signIn.email({
+          email,
+          password,
+        });
+
+        if (signInResult.error) {
+          console.error(
+            "[Onboarding] Sign in after verify error:",
+            signInResult.error
+          );
+          // Even if sign-in fails, the account is verified - try redirecting
+          // The user might already have a session from signUp
+        }
+
+        // Success - move to brand setup step
+        goToStep("brand", "right");
+        setIsLoading(false);
+      } catch {
+        setError("Failed to verify email");
+        setIsLoading(false);
+      }
+    },
+    [otp, email, password]
+  );
+
   const handleOtpPaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
     const pastedData = e.clipboardData
@@ -434,58 +531,13 @@ export default function OnboardingPage() {
     // Focus the last filled input or the next empty one
     const lastIndex = Math.min(pastedData.length, 5);
     otpRefs.current[lastIndex]?.focus();
-  };
 
-  const handleVerify = useCallback(async () => {
-    const otpString = otp.join("");
-    if (otpString.length !== 6) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Verify the email with OTP
-      console.log("[Onboarding] Verifying email with OTP");
-      const verifyResult = await emailOtp.verifyEmail({
-        email,
-        otp: otpString,
-      });
-
-      if (verifyResult.error) {
-        console.error(
-          "[Onboarding] Email verification error:",
-          verifyResult.error
-        );
-        setError(verifyResult.error.message || "Invalid verification code");
-        setIsLoading(false);
-        return;
-      }
-
-      console.log("[Onboarding] Email verified, signing in");
-
-      // Email verified - now sign in with email/password
-      const signInResult = await signIn.email({
-        email,
-        password,
-      });
-
-      if (signInResult.error) {
-        console.error(
-          "[Onboarding] Sign in after verify error:",
-          signInResult.error
-        );
-        // Even if sign-in fails, the account is verified - try redirecting
-        // The user might already have a session from signUp
-      }
-
-      // Success - move to brand setup step
-      goToStep("brand", "right");
-      setIsLoading(false);
-    } catch {
-      setError("Failed to verify email");
-      setIsLoading(false);
+    // Auto-verify if full code was pasted
+    if (pastedData.length === 6) {
+      // Pass the pasted OTP directly to avoid state timing issues
+      handleVerify(pastedData);
     }
-  }, [otp, email, password]);
+  };
 
   const handleResend = async () => {
     if (!canResend) return;
@@ -610,6 +662,175 @@ export default function OnboardingPage() {
     goToStep("email", "left");
   };
 
+  // Generate prompts for all selected topics
+  const handleGeneratePrompts = async () => {
+    if (!analysisResult || selectedTopics.size === 0) return;
+
+    setIsGeneratingPrompts(true);
+    goToStep("prompts", "right");
+
+    try {
+      // Get all topics (both from analysis and custom)
+      const allTopics = [...analysisResult.topics, ...customTopics];
+      const selectedTopicsList = allTopics.filter((t) =>
+        selectedTopics.has(t.name)
+      );
+
+      // Generate prompts for each topic in parallel
+      const results = await Promise.all(
+        selectedTopicsList.map(async (topic) => {
+          try {
+            const response = await fetch("/api/generate-prompts", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                topic: topic.name,
+                domain: analysisResult.domain,
+                workspaceName: analysisResult.brandName,
+                count: 6,
+              }),
+            });
+
+            if (!response.ok) {
+              console.error(`Failed to generate prompts for ${topic.name}`);
+              return {
+                name: topic.name,
+                description: topic.description,
+                prompts: [],
+                isExpanded: false,
+              };
+            }
+
+            const data = await response.json();
+            const prompts: GeneratedPrompt[] = (data.prompts || []).map(
+              (p: { text: string; category: string }, idx: number) => ({
+                id: `${topic.name}-${idx}-${Date.now()}`,
+                text: p.text,
+                category: p.category,
+              })
+            );
+
+            return {
+              name: topic.name,
+              description: topic.description,
+              prompts,
+              isExpanded: false,
+            };
+          } catch (err) {
+            console.error(`Error generating prompts for ${topic.name}:`, err);
+            return {
+              name: topic.name,
+              description: topic.description,
+              prompts: [],
+              isExpanded: false,
+            };
+          }
+        })
+      );
+
+      // Expand the first topic by default
+      if (results.length > 0) {
+        results[0].isExpanded = true;
+      }
+
+      setTopicsWithPrompts(results);
+    } catch (err) {
+      console.error("Error generating prompts:", err);
+    } finally {
+      setIsGeneratingPrompts(false);
+    }
+  };
+
+  // Submit prompts: create org/domain, save prompts, trigger parallel run, redirect
+  const handleSubmitPrompts = async () => {
+    if (!analysisResult || topicsWithPrompts.length === 0) return;
+
+    setIsSubmittingPrompts(true);
+    setSubmitError(null);
+
+    try {
+      // 1. Create organization with domain
+      const orgRes = await fetch("/api/organizations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: analysisResult.brandName,
+          domain: cleanedWebsite,
+        }),
+      });
+
+      if (!orgRes.ok) {
+        const errorData = await orgRes.json();
+        throw new Error(errorData.error || "Failed to create organization");
+      }
+
+      const { organization, domain: createdDomain } = await orgRes.json();
+
+      if (!createdDomain) {
+        throw new Error("Failed to create domain");
+      }
+
+      // 2. Collect all prompts from all topics
+      const allPrompts = topicsWithPrompts.flatMap((topic) =>
+        topic.prompts.map((p) => ({
+          promptText: p.text,
+          category: p.category as
+            | "brand"
+            | "product"
+            | "comparison"
+            | "recommendation"
+            | "problem_solution",
+        }))
+      );
+
+      // 3. Save prompts to database using bulk API
+      const promptsRes = await fetch(
+        `/api/workspaces/${organization.id}/domains/${createdDomain.id}/prompts/bulk`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompts: allPrompts }),
+        }
+      );
+
+      if (!promptsRes.ok) {
+        const errorData = await promptsRes.json();
+        throw new Error(errorData.error || "Failed to save prompts");
+      }
+
+      // 4. Trigger parallel prompt runs (fire and forget)
+      fetch(
+        `/api/workspaces/${organization.id}/domains/${createdDomain.id}/run-parallel`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }
+      ).catch((err) => {
+        console.error("Error triggering parallel run:", err);
+      });
+
+      // 5. Redirect to dashboard
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Error submitting prompts:", err);
+      setSubmitError(
+        err instanceof Error ? err.message : "Failed to submit prompts"
+      );
+      setIsSubmittingPrompts(false);
+    }
+  };
+
+  // Helper to generate a unique ID
+  const generatePromptId = () => {
+    return `prompt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  };
+
+  // Count total prompts across all topics
+  const totalPromptCount = topicsWithPrompts.reduce(
+    (acc, topic) => acc + topic.prompts.length,
+    0
+  );
+
   const goBack = () => {
     setError(null);
     setWebsiteError(null);
@@ -651,6 +872,695 @@ export default function OnboardingPage() {
       opacity: 0,
     }),
   };
+
+  // Prompts step has its own full-width layout
+  if (currentStep === "prompts" && analysisResult) {
+    return (
+      <div className="min-h-screen bg-white">
+        {/* Header */}
+        <div className="border-b border-gray-200">
+          <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <DomainLogo domain={analysisResult.domain} className="w-6 h-6" />
+              <span className="font-semibold text-gray-900">
+                {analysisResult.brandName}
+              </span>
+              <span className="text-gray-300">|</span>
+              <span className="text-gray-400">{analysisResult.domain}</span>
+            </div>
+            <button
+              onClick={() => setShowSubmitModal(true)}
+              disabled={totalPromptCount === 0}
+              className="px-4 py-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              Continue to Results
+            </button>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Review the list of prompts curated for your brand
+            </h1>
+            <p className="text-gray-500">
+              You get 100 prompts total to run each day. We recommend starting
+              with 25-50 prompts to begin.
+            </p>
+          </div>
+
+          {/* Your Prompt List */}
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-gray-900">Your Prompt List</h2>
+              <p className="text-sm text-gray-500">
+                We&apos;ve generated {totalPromptCount} prompts for you. Please
+                review and submit your prompts.
+              </p>
+            </div>
+
+            {/* Add Prompt Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowAddPromptDropdown(!showAddPromptDropdown)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Add Prompt
+                <ChevronDown className="w-4 h-4" />
+              </button>
+
+              {showAddPromptDropdown && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                  <div className="py-1">
+                    {topicsWithPrompts.map((topic) => (
+                      <button
+                        key={topic.name}
+                        onClick={() => {
+                          setAddingPromptToTopic(topic.name);
+                          setShowAddPromptDropdown(false);
+                          // Expand the topic
+                          setTopicsWithPrompts((prev) =>
+                            prev.map((t) =>
+                              t.name === topic.name
+                                ? { ...t, isExpanded: true }
+                                : t
+                            )
+                          );
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        {topic.name}
+                      </button>
+                    ))}
+                    <div className="border-t border-gray-100 mt-1 pt-1">
+                      <button
+                        onClick={() => {
+                          setIsAddingNewTopic(true);
+                          setShowAddPromptDropdown(false);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Topic
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Loading State */}
+          {isGeneratingPrompts && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 text-gray-400 animate-spin mb-4" />
+              <p className="text-gray-600 font-medium">
+                Generating prompts for your topics...
+              </p>
+              <p className="text-gray-400 text-sm mt-1">
+                This may take a few moments
+              </p>
+            </div>
+          )}
+
+          {/* Topics Cards */}
+          {!isGeneratingPrompts && (
+            <div className="space-y-4">
+              {/* Topic Cards */}
+              {topicsWithPrompts.map((topic) => (
+                <div
+                  key={topic.name}
+                  className="border border-gray-200 rounded-lg overflow-hidden"
+                >
+                  {/* Topic Header - Gray Background */}
+                  <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
+                    <div
+                      className="flex items-center gap-2 cursor-pointer flex-1"
+                      onClick={() => {
+                        setTopicsWithPrompts((prev) =>
+                          prev.map((t) =>
+                            t.name === topic.name
+                              ? { ...t, isExpanded: !t.isExpanded }
+                              : t
+                          )
+                        );
+                      }}
+                    >
+                      {topic.isExpanded ? (
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                      )}
+                      {editingTopicName === topic.name ? (
+                        <div
+                          className="flex items-center gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="text"
+                            value={editingTopicNameText}
+                            onChange={(e) =>
+                              setEditingTopicNameText(e.target.value)
+                            }
+                            autoFocus
+                            className="px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] text-sm font-medium"
+                            onKeyDown={(e) => {
+                              if (
+                                e.key === "Enter" &&
+                                editingTopicNameText.trim()
+                              ) {
+                                setTopicsWithPrompts((prev) =>
+                                  prev.map((t) =>
+                                    t.name === topic.name
+                                      ? {
+                                          ...t,
+                                          name: editingTopicNameText.trim(),
+                                        }
+                                      : t
+                                  )
+                                );
+                                setEditingTopicName(null);
+                                setEditingTopicNameText("");
+                              } else if (e.key === "Escape") {
+                                setEditingTopicName(null);
+                                setEditingTopicNameText("");
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              if (editingTopicNameText.trim()) {
+                                setTopicsWithPrompts((prev) =>
+                                  prev.map((t) =>
+                                    t.name === topic.name
+                                      ? {
+                                          ...t,
+                                          name: editingTopicNameText.trim(),
+                                        }
+                                      : t
+                                  )
+                                );
+                                setEditingTopicName(null);
+                                setEditingTopicNameText("");
+                              }
+                            }}
+                            className="p-1 bg-[#6366f1] text-white rounded hover:bg-[#4f46e5]"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingTopicName(null);
+                              setEditingTopicNameText("");
+                            }}
+                            className="p-1 bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="font-medium text-gray-900">
+                            {topic.name}
+                          </span>
+                          <span className="text-sm text-gray-400">
+                            {topic.prompts.length} prompts
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    {/* Three Dots Menu */}
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenTopicMenu(
+                            openTopicMenu === topic.name ? null : topic.name
+                          );
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded transition-colors"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                      {openTopicMenu === topic.name && (
+                        <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTopicName(topic.name);
+                              setEditingTopicNameText(topic.name);
+                              setOpenTopicMenu(null);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            Edit Topic
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTopicsWithPrompts((prev) =>
+                                prev.filter((t) => t.name !== topic.name)
+                              );
+                              setOpenTopicMenu(null);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete Topic
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanded Prompts - White Background */}
+                  {topic.isExpanded && (
+                    <div className="bg-white">
+                      {topic.prompts.map((prompt) => (
+                        <div
+                          key={prompt.id}
+                          className="group px-4 py-3 pl-10 border-b border-gray-100 last:border-b-0 hover:bg-gray-50"
+                        >
+                          {editingPromptId === prompt.id ? (
+                            /* Inline Edit Mode */
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editingPromptText}
+                                onChange={(e) =>
+                                  setEditingPromptText(e.target.value)
+                                }
+                                autoFocus
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1]"
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    setTopicsWithPrompts((prev) =>
+                                      prev.map((t) =>
+                                        t.name === topic.name
+                                          ? {
+                                              ...t,
+                                              prompts: t.prompts.map((p) =>
+                                                p.id === prompt.id
+                                                  ? {
+                                                      ...p,
+                                                      text: editingPromptText,
+                                                    }
+                                                  : p
+                                              ),
+                                            }
+                                          : t
+                                      )
+                                    );
+                                    setEditingPromptId(null);
+                                    setEditingPromptText("");
+                                  } else if (e.key === "Escape") {
+                                    setEditingPromptId(null);
+                                    setEditingPromptText("");
+                                  }
+                                }}
+                              />
+                              <button
+                                onClick={() => {
+                                  setTopicsWithPrompts((prev) =>
+                                    prev.map((t) =>
+                                      t.name === topic.name
+                                        ? {
+                                            ...t,
+                                            prompts: t.prompts.map((p) =>
+                                              p.id === prompt.id
+                                                ? {
+                                                    ...p,
+                                                    text: editingPromptText,
+                                                  }
+                                                : p
+                                            ),
+                                          }
+                                        : t
+                                    )
+                                  );
+                                  setEditingPromptId(null);
+                                  setEditingPromptText("");
+                                }}
+                                className="p-2 bg-[#6366f1] text-white rounded-lg hover:bg-[#4f46e5]"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingPromptId(null);
+                                  setEditingPromptText("");
+                                }}
+                                className="p-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setTopicsWithPrompts((prev) =>
+                                    prev.map((t) =>
+                                      t.name === topic.name
+                                        ? {
+                                            ...t,
+                                            prompts: t.prompts.filter(
+                                              (p) => p.id !== prompt.id
+                                            ),
+                                          }
+                                        : t
+                                    )
+                                  );
+                                  setEditingPromptId(null);
+                                  setEditingPromptText("");
+                                }}
+                                className="p-2 text-gray-400 hover:text-red-500"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            /* Normal Display Mode */
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-700">
+                                {prompt.text}
+                              </span>
+                              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingPromptId(prompt.id);
+                                    setEditingPromptText(prompt.text);
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                  Edit Prompt
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTopicsWithPrompts((prev) =>
+                                      prev.map((t) =>
+                                        t.name === topic.name
+                                          ? {
+                                              ...t,
+                                              prompts: t.prompts.filter(
+                                                (p) => p.id !== prompt.id
+                                              ),
+                                            }
+                                          : t
+                                      )
+                                    );
+                                  }}
+                                  className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Add Prompt Input */}
+                      {addingPromptToTopic === topic.name ? (
+                        <div className="px-4 py-3 pl-10 border-t border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={newPromptText}
+                              onChange={(e) => setNewPromptText(e.target.value)}
+                              placeholder="Enter new prompt..."
+                              autoFocus
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1]"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && newPromptText.trim()) {
+                                  setTopicsWithPrompts((prev) =>
+                                    prev.map((t) =>
+                                      t.name === topic.name
+                                        ? {
+                                            ...t,
+                                            prompts: [
+                                              ...t.prompts,
+                                              {
+                                                id: generatePromptId(),
+                                                text: newPromptText.trim(),
+                                                category: "brand",
+                                              },
+                                            ],
+                                          }
+                                        : t
+                                    )
+                                  );
+                                  setNewPromptText("");
+                                  setAddingPromptToTopic(null);
+                                } else if (e.key === "Escape") {
+                                  setNewPromptText("");
+                                  setAddingPromptToTopic(null);
+                                }
+                              }}
+                            />
+                            <button
+                              onClick={() => {
+                                if (newPromptText.trim()) {
+                                  setTopicsWithPrompts((prev) =>
+                                    prev.map((t) =>
+                                      t.name === topic.name
+                                        ? {
+                                            ...t,
+                                            prompts: [
+                                              ...t.prompts,
+                                              {
+                                                id: generatePromptId(),
+                                                text: newPromptText.trim(),
+                                                category: "brand",
+                                              },
+                                            ],
+                                          }
+                                        : t
+                                    )
+                                  );
+                                  setNewPromptText("");
+                                  setAddingPromptToTopic(null);
+                                }
+                              }}
+                              className="p-2 bg-[#6366f1] text-white rounded-lg hover:bg-[#4f46e5]"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setNewPromptText("");
+                                setAddingPromptToTopic(null);
+                              }}
+                              className="p-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setAddingPromptToTopic(topic.name)}
+                          className="w-full px-4 py-3 pl-10 text-left text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Prompt
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Add Topic Row */}
+              {isAddingNewTopic ? (
+                <div className="px-4 py-3 border border-gray-200 rounded-lg bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newTopicName}
+                      onChange={(e) => setNewTopicName(e.target.value)}
+                      placeholder="Enter topic name..."
+                      autoFocus
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1]"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newTopicName.trim()) {
+                          setTopicsWithPrompts((prev) => [
+                            ...prev,
+                            {
+                              name: newTopicName.trim(),
+                              description: "Custom topic",
+                              prompts: [],
+                              isExpanded: true,
+                            },
+                          ]);
+                          setAddingPromptToTopic(newTopicName.trim());
+                          setNewTopicName("");
+                          setIsAddingNewTopic(false);
+                        } else if (e.key === "Escape") {
+                          setNewTopicName("");
+                          setIsAddingNewTopic(false);
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        if (newTopicName.trim()) {
+                          setTopicsWithPrompts((prev) => [
+                            ...prev,
+                            {
+                              name: newTopicName.trim(),
+                              description: "Custom topic",
+                              prompts: [],
+                              isExpanded: true,
+                            },
+                          ]);
+                          setAddingPromptToTopic(newTopicName.trim());
+                          setNewTopicName("");
+                          setIsAddingNewTopic(false);
+                        }
+                      }}
+                      className="p-2 bg-[#6366f1] text-white rounded-lg hover:bg-[#4f46e5]"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setNewTopicName("");
+                        setIsAddingNewTopic(false);
+                      }}
+                      className="p-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsAddingNewTopic(true)}
+                  className="px-4 py-3 text-left text-sm text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Topic
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Submit Modal - Will be added in final step */}
+        {showSubmitModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full mx-4 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Ready to run your prompts on these platforms?
+                </h2>
+                <button
+                  onClick={() => setShowSubmitModal(false)}
+                  className="p-1 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-gray-500 mb-6">
+                You have {totalPromptCount} prompts total in your list.
+              </p>
+
+              {/* Platform Selection */}
+              <div className="border border-gray-200 rounded-lg divide-y divide-gray-200 mb-6">
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.896zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"
+                        fill="white"
+                      />
+                    </svg>
+                  </div>
+                  <span className="text-gray-900 font-medium">ChatGPT</span>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 2L2 19h20L12 2z" fill="#20B2AA" />
+                    </svg>
+                  </div>
+                  <span className="text-gray-900 font-medium">Perplexity</span>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center">
+                    <svg width="16" height="16" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      />
+                    </svg>
+                  </div>
+                  <span className="text-gray-900 font-medium">
+                    Google AI Overviews
+                  </span>
+                </div>
+              </div>
+
+              {submitError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-600">{submitError}</p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowSubmitModal(false)}
+                  disabled={isSubmittingPrompts}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitPrompts}
+                  disabled={isSubmittingPrompts}
+                  className="flex-1 px-4 py-2.5 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSubmittingPrompts ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    `Submit Prompts (${totalPromptCount})`
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Click outside to close dropdowns */}
+        {showAddPromptDropdown && (
+          <div
+            className="fixed inset-0 z-0"
+            onClick={() => {
+              setShowAddPromptDropdown(false);
+            }}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -829,7 +1739,7 @@ export default function OnboardingPage() {
                   <button
                     onClick={handleSignIn}
                     disabled={!password || isLoading}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
                   >
                     {isLoading ? (
                       <>
@@ -867,23 +1777,26 @@ export default function OnboardingPage() {
                       What&apos;s your company size?
                     </label>
                     <div className="grid grid-cols-2 gap-3">
-                      {COMPANY_SIZES.map((size) => (
-                        <button
-                          key={size}
-                          onClick={() => setCompanySize(size)}
-                          className={`px-4 py-3 text-sm font-medium rounded-lg border transition-colors ${
-                            companySize === size
-                              ? "border-gray-900 bg-gray-900 text-white"
-                              : "border-gray-200 bg-white text-gray-900 hover:border-gray-300"
-                          } ${
-                            size === "1001+ employees"
-                              ? "col-span-2 sm:col-span-1"
-                              : ""
-                          }`}
-                        >
-                          {size}
-                        </button>
-                      ))}
+                      {COMPANY_SIZES.map((size) => {
+                        const isSelected = companySize === size;
+                        return (
+                          <button
+                            key={size}
+                            onClick={() => setCompanySize(size)}
+                            className={cn(
+                              "px-4 py-3 rounded-lg border text-sm font-medium text-center",
+                              isSelected
+                                ? "bg-[#6366f1] border-[#6366f1] text-white"
+                                : "bg-white border-gray-200 text-gray-900 hover:border-gray-300",
+                              size === "1001+ employees"
+                                ? "col-span-2 sm:col-span-1"
+                                : ""
+                            )}
+                          >
+                            {size}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -929,7 +1842,7 @@ export default function OnboardingPage() {
                   <button
                     onClick={handleCompanySubmit}
                     disabled={!companySize}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-900 font-medium rounded-lg transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
                   >
                     Continue
                   </button>
@@ -978,6 +1891,7 @@ export default function OnboardingPage() {
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
                         autoFocus
+                        autoComplete="given-name"
                         className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
                       />
                     </div>
@@ -990,6 +1904,7 @@ export default function OnboardingPage() {
                         placeholder="Last name"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
+                        autoComplete="family-name"
                         className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
                       />
                     </div>
@@ -1005,6 +1920,7 @@ export default function OnboardingPage() {
                         placeholder="Enter password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="new-password"
                         className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-colors"
                       />
                       <button
@@ -1068,7 +1984,7 @@ export default function OnboardingPage() {
                   <button
                     onClick={handleAccountSubmit}
                     disabled={!isAccountValid || isLoading}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-900 font-medium rounded-lg transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
                   >
                     {isLoading ? (
                       <>
@@ -1159,9 +2075,9 @@ export default function OnboardingPage() {
                   </div>
 
                   <button
-                    onClick={handleVerify}
+                    onClick={() => handleVerify()}
                     disabled={!isOtpComplete || isLoading}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-900 font-medium rounded-lg transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
                   >
                     {isLoading ? (
                       <>
@@ -1276,7 +2192,7 @@ export default function OnboardingPage() {
                     <button
                       onClick={handleBrandSubmit}
                       disabled={!website.trim() || isValidatingDomain}
-                      className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-900 font-medium rounded-lg transition-colors"
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
                     >
                       {isValidatingDomain ? (
                         <>
@@ -1425,7 +2341,7 @@ export default function OnboardingPage() {
 
                     <button
                       onClick={handleAnalysisContinue}
-                      className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] text-white font-medium rounded-lg transition-colors"
                     >
                       Continue
                     </button>
@@ -1474,7 +2390,7 @@ export default function OnboardingPage() {
 
                   <button
                     onClick={() => goToStep("topics", "right")}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] text-white font-medium rounded-lg transition-colors"
                   >
                     Continue
                   </button>
@@ -1538,15 +2454,24 @@ export default function OnboardingPage() {
                             }}
                             disabled={!canSelect}
                             className={cn(
-                              "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
-                              isSelected
-                                ? "bg-gray-900 border-gray-900 text-white"
-                                : canSelect
+                              "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium",
+                              canSelect
                                 ? "bg-white border-gray-200 text-gray-900 hover:border-gray-300"
                                 : "bg-gray-50 border-gray-100 text-gray-400 cursor-not-allowed"
                             )}
                           >
-                            {isSelected && <Check className="w-4 h-4" />}
+                            <div
+                              className={cn(
+                                "w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border",
+                                isSelected
+                                  ? "bg-[#6366f1] border-[#6366f1]"
+                                  : "bg-white border-gray-300"
+                              )}
+                            >
+                              {isSelected && (
+                                <Check className="w-3 h-3 text-white" />
+                              )}
+                            </div>
                             {topic.name}
                           </button>
                         );
@@ -1562,6 +2487,10 @@ export default function OnboardingPage() {
                           onChange={(e) => setCustomTopicInput(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && customTopicInput.trim()) {
+                              if (selectedTopics.size >= 10) {
+                                setError("You can only select up to 10 topics");
+                                return;
+                              }
                               const newTopic = {
                                 name: customTopicInput.trim(),
                                 description: "Custom topic",
@@ -1575,6 +2504,7 @@ export default function OnboardingPage() {
                               );
                               setCustomTopicInput("");
                               setIsAddingCustomTopic(false);
+                              setError(null);
                             } else if (e.key === "Escape") {
                               setCustomTopicInput("");
                               setIsAddingCustomTopic(false);
@@ -1582,11 +2512,15 @@ export default function OnboardingPage() {
                           }}
                           autoFocus
                           placeholder="Enter topic..."
-                          className="px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-900/20 focus:border-gray-900 w-40"
+                          className="px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] w-40"
                         />
                         <button
                           onClick={() => {
                             if (customTopicInput.trim()) {
+                              if (selectedTopics.size >= 10) {
+                                setError("You can only select up to 10 topics");
+                                return;
+                              }
                               const newTopic = {
                                 name: customTopicInput.trim(),
                                 description: "Custom topic",
@@ -1600,9 +2534,10 @@ export default function OnboardingPage() {
                               );
                               setCustomTopicInput("");
                               setIsAddingCustomTopic(false);
+                              setError(null);
                             }
                           }}
-                          className="p-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800"
+                          className="p-2 rounded-lg bg-[#6366f1] text-white hover:bg-[#4f46e5]"
                         >
                           <Check className="w-4 h-4" />
                         </button>
@@ -1633,13 +2568,16 @@ export default function OnboardingPage() {
                     )}
                   </div>
 
+                  {error && (
+                    <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm mb-4">
+                      {error}
+                    </div>
+                  )}
+
                   <button
-                    onClick={() => {
-                      // TODO: Save selected topics and redirect to dashboard
-                      router.push("/dashboard");
-                    }}
+                    onClick={handleGeneratePrompts}
                     disabled={selectedTopics.size === 0}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
                   >
                     Looks good
                   </button>

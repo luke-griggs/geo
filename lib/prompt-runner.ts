@@ -375,3 +375,167 @@ export async function runAllPrompts(
 
   return allResults;
 }
+
+/**
+ * Run a single prompt and return result (used by parallel runner)
+ * This is a helper that doesn't throw - it returns the result with success/error status
+ */
+async function runSinglePromptSafe(
+  p: { id: string; promptText: string },
+  domainName: string,
+  domainId: string,
+  provider: LLMProvider = "chatgpt"
+): Promise<RunResult> {
+  const promptRunId = generateId();
+
+  try {
+    const response = await runPromptAgainstLLM(p.promptText, provider);
+
+    if (isLLMError(response)) {
+      // Store the failed run
+      await db.insert(promptRun).values({
+        id: promptRunId,
+        promptId: p.id,
+        llmProvider: provider,
+        error: response.error,
+        executedAt: new Date(),
+      });
+
+      return {
+        promptId: p.id,
+        promptRunId,
+        provider,
+        success: false,
+        error: response.error,
+      };
+    }
+
+    // Enrich citations with meta descriptions (fetched from URLs)
+    const enrichedCitations = response.citations
+      ? await enrichCitationsWithDescriptions(response.citations)
+      : undefined;
+
+    // Store the successful run
+    await db.insert(promptRun).values({
+      id: promptRunId,
+      promptId: p.id,
+      llmProvider: provider,
+      responseText: response.text,
+      responseMetadata: response.metadata,
+      searchQueries: response.searchQueries,
+      citations: enrichedCitations,
+      durationMs: response.durationMs,
+      executedAt: new Date(),
+    });
+
+    // Analyze for mentions
+    const analysis = analyzeResponseForMentions(response.text, domainName);
+
+    // Store mention analysis
+    await db.insert(mentionAnalysis).values({
+      id: generateId(),
+      promptRunId,
+      domainId: domainId,
+      mentioned: analysis.mentioned,
+      position: analysis.position,
+      contextSnippet: analysis.contextSnippet,
+    });
+
+    // Extract and store brand mentions from the response
+    await storeBrandMentions(response.text, promptRunId);
+
+    return {
+      promptId: p.id,
+      promptRunId,
+      provider,
+      success: true,
+      mentioned: analysis.mentioned,
+      responsePreview: response.text.slice(0, 200),
+    };
+  } catch (error) {
+    console.error(`Error running prompt ${p.id}:`, error);
+
+    return {
+      promptId: p.id,
+      promptRunId,
+      provider,
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Run prompts in parallel with a specified concurrency limit
+ * Updates domain progress as prompts complete
+ */
+export async function runPromptsInParallel(
+  domainId: string,
+  concurrency: number = 5,
+  provider: LLMProvider = "chatgpt"
+): Promise<RunResult[]> {
+  const results: RunResult[] = [];
+
+  // Get the domain
+  const domainRecord = await db.query.domain.findFirst({
+    where: eq(domain.id, domainId),
+  });
+
+  if (!domainRecord) {
+    throw new Error(`Domain not found: ${domainId}`);
+  }
+
+  // Get all active prompts for this domain
+  const activePrompts = await db.query.prompt.findMany({
+    where: and(eq(prompt.domainId, domainId), eq(prompt.isActive, true)),
+  });
+
+  console.log(
+    `Running ${activePrompts.length} prompts in parallel (concurrency: ${concurrency}) for domain ${domainRecord.domain}`
+  );
+
+  let completedCount = 0;
+
+  // Process prompts in batches
+  for (let i = 0; i < activePrompts.length; i += concurrency) {
+    const batch = activePrompts.slice(i, i + concurrency);
+
+    // Run batch in parallel
+    const batchResults = await Promise.all(
+      batch.map((p) =>
+        runSinglePromptSafe(p, domainRecord.domain, domainId, provider)
+      )
+    );
+
+    results.push(...batchResults);
+    completedCount += batchResults.length;
+
+    // Update domain progress
+    await db
+      .update(domain)
+      .set({
+        promptRunProgress: completedCount,
+      })
+      .where(eq(domain.id, domainId));
+
+    console.log(`Progress: ${completedCount}/${activePrompts.length}`);
+
+    // Small delay between batches to avoid rate limiting
+    if (i + concurrency < activePrompts.length) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+
+  // Mark domain as completed
+  await db
+    .update(domain)
+    .set({
+      promptRunStatus: "completed",
+      promptRunProgress: completedCount,
+    })
+    .where(eq(domain.id, domainId));
+
+  console.log(`Completed all ${completedCount} prompts for domain ${domainId}`);
+
+  return results;
+}

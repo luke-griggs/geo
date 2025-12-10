@@ -42,7 +42,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemPrompt = `You are an expert at crafting search queries that people would ask AI assistants like ChatGPT, Claude, or Perplexity. Given a topic and company context, generate ${count} realistic search prompts.
+    const systemPrompt = `You are an expert at crafting search queries that people would ask AI assistants like ChatGPT, Claude, or Perplexity. Given a topic and industry context, generate ${count} realistic search prompts.
+
+IMPORTANT: The prompts should be about the INDUSTRY/SPACE as a whole, NOT specific to any particular brand. The goal is to see how often a brand naturally shows up in responses to general industry questions.
 
 The prompts should:
 - Sound natural, like how a real person would ask an AI assistant
@@ -52,26 +54,26 @@ The prompts should:
 - Be 10-50 words each
 
 Categories:
-- "brand": Direct brand/company related questions
-- "product": Product-specific queries
-- "comparison": Comparing options or alternatives
-- "recommendation": Asking for suggestions
+- "brand": Direct questions about who the leaders are in the space
+- "product": Product category queries
+- "comparison": Comparing options or alternatives in the space
+- "recommendation": Asking for suggestions on what to choose
 - "problem_solution": Looking to solve a specific problem
 
-Return ONLY a valid JSON array of objects with "text" and "category" fields. No markdown, no explanations.
+Return ONLY a valid JSON array of objects with "text" and "category" fields. Do not include anything in 
 
-Example output:
+Example output for a scheduling software company:
 [
   {"text": "What is the best scheduling software for small businesses?", "category": "recommendation"},
-  {"text": "How does Calendly compare to Acuity Scheduling?", "category": "comparison"},
-  {"text": "I need to set up automated appointment booking for my salon", "category": "problem_solution"}
+  {"text": "What are the top appointment booking tools for service businesses?", "category": "brand"},
+  {"text": "I need help setting up automated appointment reminders for my salon", "category": "problem_solution"},
+  {"text": "Which online scheduling platforms integrate with Google Calendar?", "category": "comparison"}
 ]`;
 
     const userPrompt = `Topic: ${topic}
-Domain: ${domain}
-Company: ${workspaceName || domain}
+Industry Context: ${workspaceName || domain} operates in this space
 
-Generate ${count} search prompts that someone interested in "${topic}" might ask an AI assistant.`;
+Generate ${count} search prompts that someone interested in "${topic}" might ask an AI assistant. Remember: these should be GENERAL industry questions, not specific to any brand.`;
 
     const response = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -82,12 +84,13 @@ Generate ${count} search prompts that someone interested in "${topic}" might ask
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
+          response_format: { type: "json_object" },
           model: "meta-llama/llama-4-maverick-17b-128e-instruct",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: 0.8, // Slightly higher for variety
+          temperature: 0.7,
           max_tokens: 2048,
         }),
       }
@@ -119,7 +122,29 @@ Generate ${count} search prompts that someone interested in "${topic}" might ask
         .replace(/```\n?/g, "")
         .trim();
 
-      const prompts: GeneratedPrompt[] = JSON.parse(cleanedContent);
+      const parsed = JSON.parse(cleanedContent);
+
+      // Handle both direct array and wrapped object responses
+      let prompts: GeneratedPrompt[];
+      if (Array.isArray(parsed)) {
+        prompts = parsed;
+      } else if (parsed.prompts && Array.isArray(parsed.prompts)) {
+        prompts = parsed.prompts;
+      } else if (parsed.response && Array.isArray(parsed.response)) {
+        prompts = parsed.response;
+      } else {
+        // Try to find any array property
+        const arrayProp = Object.values(parsed).find((v) => Array.isArray(v));
+        if (arrayProp) {
+          prompts = arrayProp as GeneratedPrompt[];
+        } else {
+          console.error("No array found in response:", parsed);
+          return NextResponse.json(
+            { error: "Invalid response format" },
+            { status: 500 }
+          );
+        }
+      }
 
       // Validate the response
       const validCategories = [
@@ -158,5 +183,3 @@ Generate ${count} search prompts that someone interested in "${topic}" might ask
     );
   }
 }
-
-

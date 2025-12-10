@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Loader2,
   FileText,
@@ -54,6 +54,51 @@ interface ModelPerformanceItem {
   visibilityRate: number;
 }
 
+interface RunStatus {
+  status: "pending" | "running" | "completed";
+  progress: number;
+  total: number;
+}
+
+// Dotted background pattern component
+function DottedBackground() {
+  return (
+    <div
+      className="absolute inset-0 opacity-30"
+      style={{
+        backgroundImage: `radial-gradient(circle, #9ca3af 1px, transparent 1px)`,
+        backgroundSize: "16px 16px",
+      }}
+    />
+  );
+}
+
+// Loading state for prompt runs
+function PromptRunLoadingState({
+  progress,
+  total,
+}: {
+  progress: number;
+  total: number;
+}) {
+  return (
+    <div className="relative bg-white border border-gray-200 rounded-xl overflow-hidden min-h-[400px] flex items-center justify-center">
+      <DottedBackground />
+      <div className="relative z-10 flex flex-col items-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-600" />
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">
+            Running your prompts in AI answer engines
+          </h3>
+          <p className="text-sm text-gray-500">
+            {progress}/{total} answers received...
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Platform icon component
 function PlatformIcon({ platform }: { platform: string }) {
   const iconMap: Record<string, string> = {
@@ -85,6 +130,11 @@ export function OverviewSection({
   const [error, setError] = useState<string | null>(null);
   const [chartMode, setChartMode] = useState<"bar" | "line">("bar");
 
+  // Prompt run status
+  const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Calculate date range (last 7 days)
   const dateRange = useMemo(() => {
     const endDate = new Date();
@@ -94,6 +144,23 @@ export function OverviewSection({
       endDate: endDate.toISOString().split("T")[0],
     };
   }, []);
+
+  // Check prompt run status
+  const checkRunStatus = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/workspaces/${workspaceId}/domains/${domainId}/run-status`
+      );
+      if (res.ok) {
+        const status: RunStatus = await res.json();
+        setRunStatus(status);
+        return status;
+      }
+    } catch (err) {
+      console.error("Error checking run status:", err);
+    }
+    return null;
+  }, [workspaceId, domainId]);
 
   // Fetch overview data
   const fetchOverviewData = useCallback(async () => {
@@ -152,9 +219,79 @@ export function OverviewSection({
     }
   }, [workspaceId, domainId, dateRange]);
 
+  // Initial load: check status first, then decide what to show
   useEffect(() => {
-    fetchOverviewData();
-  }, [fetchOverviewData]);
+    const init = async () => {
+      setIsCheckingStatus(true);
+      const status = await checkRunStatus();
+
+      if (
+        status &&
+        (status.status === "pending" || status.status === "running")
+      ) {
+        // Start polling for status updates
+        pollingIntervalRef.current = setInterval(async () => {
+          const newStatus = await checkRunStatus();
+          if (newStatus?.status === "completed") {
+            // Stop polling and load overview data
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+            fetchOverviewData();
+          }
+        }, 2000);
+      } else {
+        // Status is completed or null, just load overview data
+        fetchOverviewData();
+      }
+
+      setIsCheckingStatus(false);
+    };
+
+    init();
+
+    // Cleanup polling on unmount
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [checkRunStatus, fetchOverviewData]);
+
+  // Show initial loading while checking status
+  if (isCheckingStatus) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          <p className="text-sm text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show prompt run loading state if prompts are still running
+  if (
+    runStatus &&
+    (runStatus.status === "pending" || runStatus.status === "running")
+  ) {
+    return (
+      <TooltipProvider>
+        <div className="flex flex-col pb-12">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">Overview</h1>
+          </div>
+
+          <PromptRunLoadingState
+            progress={runStatus.progress}
+            total={runStatus.total}
+          />
+        </div>
+      </TooltipProvider>
+    );
+  }
 
   if (isLoading) {
     return (
