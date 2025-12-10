@@ -132,19 +132,29 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const userBrandName = (
       domainRecord.name || domainRecord.domain
     ).toLowerCase();
-    const userDomainBase = domainRecord.domain
+    // Extract the main domain name (handles subdomains like "shop.fairlife.com" -> "fairlife")
+    const domainPartsForBrand = domainRecord.domain
       .toLowerCase()
       .replace(/^www\./, "")
-      .split(".")[0];
+      .split(".");
+    const userDomainBase =
+      domainPartsForBrand.length > 2
+        ? domainPartsForBrand[domainPartsForBrand.length - 2]
+        : domainPartsForBrand[0];
 
     // Find brand mentions that match the user's brand (Groq extraction)
     const userBrandMentions = brandMentions.filter((bm) => {
       const bmNameLower = bm.brandName.toLowerCase();
-      const bmDomainLower =
+      // Extract base domain from brand mention (handles subdomains like "shop.fairlife.com" -> "fairlife")
+      const bmDomainParts =
         bm.brandDomain
           ?.toLowerCase()
           .replace(/^www\./, "")
-          .split(".")[0] || "";
+          .split(".") || [];
+      const bmDomainLower =
+        bmDomainParts.length > 2
+          ? bmDomainParts[bmDomainParts.length - 2]
+          : bmDomainParts[0] || "";
       return (
         bmNameLower === userBrandName ||
         bmNameLower === userDomainBase ||
@@ -272,8 +282,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .toLowerCase()
       .replace(/^www\./, "");
 
-    // Extract the base name from the domain (e.g., "fairlife" from "fairlife.com")
-    const domainBaseName = userDomainKey.split(".")[0].toLowerCase();
+    // Extract the base name from the domain (e.g., "fairlife" from "fairlife.com" or "shop.fairlife.com")
+    const domainKeyParts = userDomainKey.split(".");
+    const domainBaseName = (
+      domainKeyParts.length > 2
+        ? domainKeyParts[domainKeyParts.length - 2]
+        : domainKeyParts[0]
+    ).toLowerCase();
     const brandNameLower = domainName.toLowerCase();
 
     // Check if any Groq-extracted brand matches the user's brand

@@ -66,7 +66,14 @@ function analyzeResponseForMentions(
   }
 
   // Also try the domain without TLD (e.g., "fairlife" from "fairlife.com")
-  const domainWithoutTld = lowerDomain.split(".")[0];
+  // This extracts the main brand name from domains like "fairlife.com" or "shop.fairlife.com"
+  const domainParts = lowerDomain.replace(/^www\./, "").split(".");
+  // Get the main domain name (second-to-last part for subdomains, or first part for simple domains)
+  const domainWithoutTld =
+    domainParts.length > 2
+      ? domainParts[domainParts.length - 2] // e.g., "shop.fairlife.com" -> "fairlife"
+      : domainParts[0]; // e.g., "fairlife.com" -> "fairlife"
+
   if (
     domainWithoutTld &&
     domainWithoutTld.length > 2 &&
