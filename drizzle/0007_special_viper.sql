@@ -1,1 +1,0 @@
-ALTER TABLE "prompt_run" ADD COLUMN "citations" jsonb;

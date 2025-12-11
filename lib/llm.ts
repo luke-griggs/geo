@@ -137,6 +137,7 @@ export async function runOpenAI(
         input: promptText,
         model: "gpt-5.1",
         tools: [{ type: "web_search" }],
+        tool_choice: "required",
         reasoning: {
           effort: "none",
         },

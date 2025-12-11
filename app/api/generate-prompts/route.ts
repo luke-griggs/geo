@@ -42,38 +42,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemPrompt = `You are an expert at crafting search queries that people would ask AI assistants like ChatGPT, Claude, or Perplexity. Given a topic and industry context, generate ${count} realistic search prompts.
+    const systemPrompt = `You are an expert at crafting search queries that people would ask AI assistants like ChatGPT, Claude, or Perplexity.
 
-IMPORTANT: The prompts should be about the INDUSTRY/SPACE as a whole, NOT specific to any particular brand. The goal is to see how often a brand naturally shows up in responses to general industry questions.
+Generate ${count} questions that a user might ask about "${topic}" - these should be about the PRODUCT CATEGORY/INDUSTRY, **NOT about any specific brand**. The goal is to see how often brands naturally show up in responses to general industry questions.
 
-The prompts should:
-- Sound natural, like how a real person would ask an AI assistant
-- Be specific enough to trigger meaningful responses
-- Vary in intent (informational, comparison, recommendation, problem-solving)
-- Include the company/brand name where appropriate
-- Be 10-50 words each
+These prompts should:
+- Have natural, HUMAN-LIKE phrasing. occasionally include slight imprecision or casual wording
+- These prompts should have absolutely zero resemblance to ai generated text. No, em-dashes
+- Cover different intents: recommendations, comparisons, how-to questions, best options
 
-Categories:
-- "brand": Direct questions about who the leaders are in the space
-- "product": Product category queries
-- "comparison": Comparing options or alternatives in the space
-- "recommendation": Asking for suggestions on what to choose
-- "problem_solution": Looking to solve a specific problem
+for example, if the topic is "electric guitars", the prompts generated would look like:
 
-Return ONLY a valid JSON array of objects with "text" and "category" fields. Do not include anything except the json array in your resposne 
+"what are some good guitars for beginners"
+"give me some recommendations for guitar amps"
+"whats the difference between single coil and humbucker pickups"
+"i want to learn guitar, what should i buy first"
 
-Example output for a scheduling software company:
-[
-  {"text": "What is the best scheduling software for small businesses?", "category": "recommendation"},
-  {"text": "What are the top appointment booking tools for service businesses?", "category": "brand"},
-  {"text": "I need help setting up automated appointment reminders for my salon", "category": "problem_solution"},
-  {"text": "Which online scheduling platforms integrate with Google Calendar?", "category": "comparison"}
-]`;
+IMPORTANT: Return ONLY valid JSON in this exact format, no markdown, reasoning, or explanations:
+
+Think carefully and deeply ponder the fact that I'm asking you to return only JSON in your final response. So while you're thinking, think about your output being JSON only. Do not output anything except for JSON. DO NOT output any paragraphs explaining what you're doing. DO NOT give an overview. RETURN JSON. I want you to ponder this while you're thinking. It is important that your response only includes json in the form below
+
+{"prompts": [{"text": "prompt 1", "category": "recommendation"}, {"text": "prompt 2", "category": "comparison"}, ...]}`;
 
     const userPrompt = `Topic: ${topic}
-Industry Context: ${workspaceName || domain} operates in this space
+Industry/Company: ${workspaceName || domain}
 
-Generate ${count} search prompts that someone interested in "${topic}" might ask an AI assistant. Remember: these should be GENERAL industry questions, not specific to any brand.`;
+Generate ${count} prompts.`;
 
     const response = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -82,16 +76,17 @@ Generate ${count} search prompts that someone interested in "${topic}" might ask
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
+          "Groq-Model-Version": "latest",
         },
         body: JSON.stringify({
-          response_format: { type: "json_object" },
-          model: "meta-llama/llama-4-maverick-17b-128e-instruct",
+          model: "groq/compound-mini",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: 0.7,
-          max_tokens: 2048,
+          response_format: { type: "json_object" },
+          temperature: 1,
+          max_completion_tokens: 1024,
         }),
       }
     );

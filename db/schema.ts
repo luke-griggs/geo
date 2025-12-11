@@ -42,6 +42,19 @@ export const promptRunStatusEnum = pgEnum("prompt_run_status", [
   "completed",
 ]);
 
+export const contentTemplateEnum = pgEnum("content_template", [
+  "smart_suggestion",
+  "blog_post",
+  "listicle",
+]);
+
+export const contentStatusEnum = pgEnum("content_status", [
+  "draft",
+  "generating",
+  "completed",
+  "failed",
+]);
+
 // ============================================
 // Auth Tables (Better Auth)
 // ============================================
@@ -350,6 +363,36 @@ export const dailyMetrics = pgTable(
   ]
 );
 
+// Content projects for AI-generated articles
+export const contentProject = pgTable(
+  "content_project",
+  {
+    id: text("id").primaryKey(),
+    domainId: text("domain_id")
+      .notNull()
+      .references(() => domain.id, { onDelete: "cascade" }),
+    keyword: text("keyword").notNull(),
+    title: text("title"),
+    template: contentTemplateEnum("template"),
+    status: contentStatusEnum("status").default("draft"),
+    serpResults:
+      jsonb("serp_results").$type<
+        Array<{ url: string; title: string; snippet: string; position: number }>
+      >(),
+    selectedPages: jsonb("selected_pages").$type<string[]>(), // URLs selected for context
+    generatedContent: text("generated_content"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("contentProject_domainId_idx").on(table.domainId),
+    index("contentProject_status_idx").on(table.status),
+  ]
+);
+
 // ============================================
 // Relations
 // ============================================
@@ -410,6 +453,7 @@ export const domainRelations = relations(domain, ({ one, many }) => ({
   prompts: many(prompt),
   mentionAnalyses: many(mentionAnalysis),
   dailyMetrics: many(dailyMetrics),
+  contentProjects: many(contentProject),
 }));
 
 export const topicRelations = relations(topic, ({ one, many }) => ({
@@ -465,6 +509,13 @@ export const brandMentionRelations = relations(brandMention, ({ one }) => ({
 export const dailyMetricsRelations = relations(dailyMetrics, ({ one }) => ({
   domain: one(domain, {
     fields: [dailyMetrics.domainId],
+    references: [domain.id],
+  }),
+}));
+
+export const contentProjectRelations = relations(contentProject, ({ one }) => ({
+  domain: one(domain, {
+    fields: [contentProject.domainId],
     references: [domain.id],
   }),
 }));
