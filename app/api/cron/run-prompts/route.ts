@@ -5,6 +5,9 @@ import { runAllPrompts } from "@/lib/prompt-runner";
 // This endpoint will be called by Vercel's cron scheduler
 // The cron schedule is configured in vercel.json
 
+// Increase max duration for Vercel - running prompts for multiple domains can take several minutes
+export const maxDuration = 300;
+
 export async function GET(request: NextRequest) {
   try {
     // Verify the request is from Vercel Cron

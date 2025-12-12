@@ -309,6 +309,15 @@ export function OverviewSection({
       });
     }
 
+    // Also invalidate on first mount if status is already completed
+    // This handles the case where user navigates back to this page
+    // and there might be stale cached data
+    if (currentStatus === "completed" && previousStatus === null) {
+      queryClient.invalidateQueries({
+        queryKey: ["overview", organizationId, domainId],
+      });
+    }
+
     // Update the ref for next comparison
     previousStatusRef.current = currentStatus ?? null;
   }, [runStatus?.status, organizationId, domainId, queryClient]);
@@ -334,8 +343,10 @@ export function OverviewSection({
         dateRange.startDate,
         dateRange.endDate
       ),
-    // Only fetch when status is completed or when we have no status info
-    enabled: !isRunning,
+    // Only fetch when status is known AND prompts are complete
+    // Without checking isStatusLoading, the query fires while runStatus is undefined
+    // which causes isRunning to be false and fetches stale/empty data prematurely
+    enabled: !isStatusLoading && !isRunning,
     // Keep previous data while refetching
     placeholderData: (previousData) => previousData,
     // Always refetch when the component mounts or when enabled changes

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import db from "@/db";
 import { domain, prompt } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -7,6 +8,10 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
 type Params = Promise<{ organizationId: string; domainId: string }>;
+
+// Increase max duration for Vercel - running 25+ prompts can take several minutes
+// Pro plan: up to 300s, Hobby plan: up to 60s (with streaming)
+export const maxDuration = 300;
 
 // POST /api/organizations/[organizationId]/domains/[domainId]/run-parallel - Run all prompts in parallel
 export async function POST(
@@ -65,11 +70,20 @@ export async function POST(
       })
       .where(eq(domain.id, domainId));
 
-    // Start parallel prompt runs in the background (fire and forget)
-    // We don't await this - it runs in the background
-    // Using concurrency of 15 with semaphore pattern for faster completion
-    runPromptsInParallel(domainId, 15).catch((error) => {
-      console.error("Error running prompts in parallel:", error);
+    // Use Next.js after() to run the prompts after the response is sent
+    // This tells Vercel to keep the function running after returning the response
+    // Critical for serverless: fire-and-forget patterns don't work - the function gets killed
+    after(async () => {
+      try {
+        await runPromptsInParallel(domainId, 15);
+      } catch (error) {
+        console.error("Error running prompts in parallel:", error);
+        // Mark domain as failed if there's an error
+        await db
+          .update(domain)
+          .set({ promptRunStatus: "completed" })
+          .where(eq(domain.id, domainId));
+      }
     });
 
     return NextResponse.json({
