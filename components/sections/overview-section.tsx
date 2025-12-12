@@ -75,6 +75,27 @@ async function fetchRunStatus(
   return res.json();
 }
 
+interface TopicWithPrompts {
+  id: string;
+  name: string;
+  description: string | null;
+  promptCount: number;
+  prompts: Array<{
+    id: string;
+    promptText: string;
+    category: string | null;
+    isActive: boolean;
+  }>;
+}
+
+interface TopicVisibilityData {
+  topicId: string;
+  visibilityScore: number;
+  citationShare: number;
+  totalRuns: number;
+  mentionedRuns: number;
+}
+
 async function fetchOverviewData(
   organizationId: string,
   domainId: string,
@@ -83,21 +104,22 @@ async function fetchOverviewData(
 ): Promise<OverviewData> {
   const params = new URLSearchParams({ startDate, endDate });
 
-  // Fetch visibility data
-  const visibilityRes = await fetch(
-    `/api/organizations/${organizationId}/domains/${domainId}/visibility?${params}`
-  );
+  // Fetch visibility data, platform breakdown, and topics in parallel
+  const [visibilityRes, modelRes, topicsRes] = await Promise.all([
+    fetch(
+      `/api/organizations/${organizationId}/domains/${domainId}/visibility?${params}`
+    ),
+    fetch(
+      `/api/organizations/${organizationId}/domains/${domainId}/model-performance?${params}`
+    ),
+    fetch(`/api/organizations/${organizationId}/domains/${domainId}/topics`),
+  ]);
 
   if (!visibilityRes.ok) {
     throw new Error("Failed to fetch visibility data");
   }
 
   const visibilityData = await visibilityRes.json();
-
-  // Fetch platform breakdown (model performance)
-  const modelRes = await fetch(
-    `/api/organizations/${organizationId}/domains/${domainId}/model-performance?${params}`
-  );
 
   let platformBreakdown: PlatformVisibility[] = [];
   if (modelRes.ok) {
@@ -111,8 +133,53 @@ async function fetchOverviewData(
     );
   }
 
-  // For now, topic performance is placeholder until we add topics
-  const topicPerformance: TopicPerformance[] = [];
+  // Fetch topic performance data
+  let topicPerformance: TopicPerformance[] = [];
+  if (topicsRes.ok) {
+    const topicsData = await topicsRes.json();
+    const topics: TopicWithPrompts[] = topicsData.topics || [];
+
+    if (topics.length > 0) {
+      // Fetch topic-level visibility data
+      const topicVisibilityRes = await fetch(
+        `/api/organizations/${organizationId}/domains/${domainId}/topic-visibility?${params}`
+      );
+
+      let topicVisibilityMap: Record<string, TopicVisibilityData> = {};
+      if (topicVisibilityRes.ok) {
+        const topicVisibilityData = await topicVisibilityRes.json();
+        topicVisibilityMap = (topicVisibilityData.topics || []).reduce(
+          (
+            acc: Record<string, TopicVisibilityData>,
+            t: TopicVisibilityData
+          ) => {
+            acc[t.topicId] = t;
+            return acc;
+          },
+          {}
+        );
+      }
+
+      // Build topic performance with visibility data
+      topicPerformance = topics
+        .filter((t) => t.promptCount > 0) // Only show topics with prompts
+        .map((topic, index) => {
+          const visData = topicVisibilityMap[topic.id];
+          return {
+            topic: topic.name,
+            promptCount: topic.promptCount,
+            visibilityRank: index + 1,
+            visibilityScore: visData?.visibilityScore || 0,
+            citationShare: visData?.citationShare || 0,
+          };
+        })
+        .sort((a, b) => b.visibilityScore - a.visibilityScore) // Sort by visibility
+        .map((topic, index) => ({
+          ...topic,
+          visibilityRank: index + 1, // Re-assign rank after sorting
+        }));
+    }
+  }
 
   return {
     visibilityScore: visibilityData.visibilityScore || 0,

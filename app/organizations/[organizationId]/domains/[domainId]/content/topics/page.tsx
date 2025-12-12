@@ -108,7 +108,7 @@ export default function TopicsContentPage() {
                 Generating your content
               </h3>
               <p className="text-sm text-gray-500">
-                We're analyzing top-cited pages and writing your article. This
+                We&apos;re analyzing top-cited pages and writing your article. This
                 may take a minute...
               </p>
             </div>

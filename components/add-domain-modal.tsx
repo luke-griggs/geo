@@ -34,12 +34,6 @@ function DomainLogo({
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
 
-  // Reset state when domain changes
-  useEffect(() => {
-    setImgError(false);
-    setImgLoaded(false);
-  }, [domain]);
-
   if (imgError || !domain) {
     return null;
   }
@@ -287,7 +281,11 @@ export function AddDomainModal({
                 <div className="relative">
                   {isValidDomain && (
                     <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                      <DomainLogo domain={cleanedDomain} className="w-5 h-5" />
+                      <DomainLogo
+                        key={cleanedDomain}
+                        domain={cleanedDomain}
+                        className="w-5 h-5"
+                      />
                     </div>
                   )}
                   <input
