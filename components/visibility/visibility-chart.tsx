@@ -35,8 +35,15 @@ export function VisibilityChart({ data, currentScore }: VisibilityChartProps) {
     };
 
     // Create a map of existing data by date for O(1) lookup
-    // API returns UTC dates - keep as-is for string matching
-    const dataMap = new Map(data.map((d) => [d.date, d]));
+    // API returns UTC dates (YYYY-MM-DD from toISOString) - convert to local for matching
+    const dataMap = new Map(
+      data.map((d) => {
+        // Parse UTC date and convert to local date string for matching
+        const utcDate = new Date(d.date + "T00:00:00Z");
+        const localDateStr = toLocalDateStr(utcDate);
+        return [localDateStr, d];
+      })
+    );
 
     // Generate past 7 days in LOCAL time (user's perspective of "today")
     const today = new Date();
