@@ -39,11 +39,19 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    return NextResponse.json({
-      status: domainRecord.promptRunStatus || "pending",
-      progress: domainRecord.promptRunProgress || 0,
-      total: domainRecord.promptRunTotal || 0,
-    });
+    return NextResponse.json(
+      {
+        status: domainRecord.promptRunStatus || "pending",
+        progress: domainRecord.promptRunProgress || 0,
+        total: domainRecord.promptRunTotal || 0,
+      },
+      {
+        headers: {
+          // Prevent caching to ensure fresh status on every poll
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error getting run status:", error);
     return NextResponse.json(

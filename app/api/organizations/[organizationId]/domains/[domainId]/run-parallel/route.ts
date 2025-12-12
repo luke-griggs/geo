@@ -74,15 +74,28 @@ export async function POST(
     // This tells Vercel to keep the function running after returning the response
     // Critical for serverless: fire-and-forget patterns don't work - the function gets killed
     after(async () => {
+      console.log(`[after] Starting prompt run for domain ${domainId}`);
       try {
         await runPromptsInParallel(domainId, 15);
+        console.log(`[after] Successfully completed prompt run for domain ${domainId}`);
       } catch (error) {
-        console.error("Error running prompts in parallel:", error);
-        // Mark domain as failed if there's an error
-        await db
-          .update(domain)
-          .set({ promptRunStatus: "completed" })
-          .where(eq(domain.id, domainId));
+        console.error("[after] Error running prompts in parallel:", error);
+      } finally {
+        // ALWAYS ensure the status is marked as completed when we exit
+        // This handles cases where the function errors out or times out partially
+        console.log(`[after] Ensuring final status is set to completed for domain ${domainId}`);
+        try {
+          await db
+            .update(domain)
+            .set({
+              promptRunStatus: "completed",
+              promptRunProgress: totalPrompts, // Use total as fallback
+            })
+            .where(eq(domain.id, domainId));
+          console.log(`[after] Final status write completed for domain ${domainId}`);
+        } catch (dbError) {
+          console.error("[after] Failed to write final status:", dbError);
+        }
       }
     });
 

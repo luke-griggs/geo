@@ -562,15 +562,20 @@ export async function runPromptsInParallel(
 
   let completedCount = 0;
   let pendingDbUpdate: Promise<void> | null = null;
+  let lastWrittenCount = 0;
 
   // Helper to update progress (debounced to avoid DB write contention)
+  // Tracks lastWrittenCount to ensure final count is always written
   const updateProgress = async () => {
     // Skip if there's already a pending update
     if (pendingDbUpdate) return;
 
+    const countToWrite = completedCount;
+    lastWrittenCount = countToWrite;
+
     pendingDbUpdate = db
       .update(domain)
-      .set({ promptRunProgress: completedCount })
+      .set({ promptRunProgress: countToWrite })
       .where(eq(domain.id, domainId))
       .then(() => {
         pendingDbUpdate = null;
@@ -631,7 +636,13 @@ export async function runPromptsInParallel(
     await pendingDbUpdate;
   }
 
-  // Mark domain as completed with final count
+  // CRITICAL: Always write the final status and count
+  // This ensures completion even if the last progress update was skipped due to debouncing
+  // (e.g., prompt 25 finished while prompt 24's update was still pending)
+  console.log(
+    `Writing final status: completedCount=${completedCount}, lastWrittenCount=${lastWrittenCount}`
+  );
+
   await db
     .update(domain)
     .set({
