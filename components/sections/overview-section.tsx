@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Loader2,
   FileText,
@@ -190,6 +190,8 @@ export function OverviewSection({
   onNavigate,
 }: OverviewSectionProps) {
   const [chartMode, setChartMode] = useState<"bar" | "line">("bar");
+  const queryClient = useQueryClient();
+  const previousStatusRef = useRef<string | null>(null);
 
   // Calculate date range (last 7 days)
   const dateRange = useMemo(() => {
@@ -223,6 +225,26 @@ export function OverviewSection({
   const isRunning =
     runStatus?.status === "pending" || runStatus?.status === "running";
 
+  // Invalidate and refetch overview data when run status changes to "completed"
+  useEffect(() => {
+    const currentStatus = runStatus?.status;
+    const previousStatus = previousStatusRef.current;
+
+    // If status just changed from running/pending to completed, invalidate queries
+    if (
+      currentStatus === "completed" &&
+      (previousStatus === "running" || previousStatus === "pending")
+    ) {
+      // Invalidate overview queries to force a fresh fetch
+      queryClient.invalidateQueries({
+        queryKey: ["overview", organizationId, domainId],
+      });
+    }
+
+    // Update the ref for next comparison
+    previousStatusRef.current = currentStatus ?? null;
+  }, [runStatus?.status, organizationId, domainId, queryClient]);
+
   // Query for overview data - only fetch when prompts are complete
   const {
     data,
@@ -248,6 +270,10 @@ export function OverviewSection({
     enabled: !isRunning,
     // Keep previous data while refetching
     placeholderData: (previousData) => previousData,
+    // Always refetch when the component mounts or when enabled changes
+    refetchOnMount: "always",
+    // Use a short stale time to ensure fresh data after prompt runs complete
+    staleTime: 0,
   });
 
   // Show initial loading while checking status

@@ -31,13 +31,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(onboardingUrl);
   }
 
-  // If user is authenticated and on auth pages, redirect to dashboard
-  if (
-    isAuthenticated &&
-    (pathname === "/sign-in" ||
-      pathname === "/sign-up" ||
-      pathname === "/onboarding")
-  ) {
+  // If user is authenticated and on sign-in/sign-up pages, redirect to dashboard
+  // Note: We allow authenticated users to access /onboarding so they can complete setup
+  // The onboarding page handles redirecting to dashboard if already completed
+  if (isAuthenticated && (pathname === "/sign-in" || pathname === "/sign-up")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

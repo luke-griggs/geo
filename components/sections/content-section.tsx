@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Sparkles,
   FileText,
@@ -9,6 +10,7 @@ import {
   ChevronRight,
   Loader2,
   RefreshCw,
+  MessageSquare,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -48,7 +50,13 @@ interface ContentSectionProps {
   domainName: string;
 }
 
-type ModalStep = "keyword" | "config" | "template" | "generating" | "view";
+type ModalStep =
+  | "keyword"
+  | "config"
+  | "template"
+  | "generating"
+  | "view"
+  | "topics-template";
 
 function StatusBadge({ status }: { status: ContentProject["status"] }) {
   const statusStyles = {
@@ -109,6 +117,7 @@ export function ContentSection({
   domainId,
   domainName,
 }: ContentSectionProps) {
+  const router = useRouter();
   const [projects, setProjects] = useState<ContentProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState<ModalStep | null>(null);
@@ -236,6 +245,16 @@ export function ContentSection({
     }
   };
 
+  const handleTopicsTemplateSelected = (
+    template: "smart_suggestion" | "blog_post" | "listicle"
+  ) => {
+    // Navigate to the topics configuration page with the selected template
+    router.push(
+      `/organizations/${organizationId}/domains/${domainId}/content/topics?template=${template}`
+    );
+    closeModals();
+  };
+
   const closeModals = () => {
     setCurrentStep(null);
     setSelectedKeyword("");
@@ -259,35 +278,72 @@ export function ContentSection({
           Start a New Project
         </h2>
 
-        {/* Create with Keywords Card */}
-        <div className="max-w-md">
-          <div className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 transition-colors bg-white">
-            <div className="flex items-start gap-4">
-              {/* Icon placeholder */}
-              <div className="w-16 h-20 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-1.5 flex-shrink-0">
-                <Sparkles className="w-4 h-4 text-gray-400" />
-                <div className="space-y-1">
-                  <div className="w-8 h-1 bg-gray-300 rounded" />
-                  <div className="w-6 h-1 bg-gray-200 rounded" />
-                  <div className="w-7 h-1 bg-gray-200 rounded" />
+        {/* Cards Container */}
+        <div className="flex gap-4">
+          {/* Create with Keywords Card */}
+          <div className="flex-1 max-w-md">
+            <div className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 transition-colors bg-white h-full">
+              <div className="flex items-start gap-4">
+                {/* Icon placeholder */}
+                <div className="w-16 h-20 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-1.5 flex-shrink-0">
+                  <Sparkles className="w-4 h-4 text-gray-400" />
+                  <div className="space-y-1">
+                    <div className="w-8 h-1 bg-gray-300 rounded" />
+                    <div className="w-6 h-1 bg-gray-200 rounded" />
+                    <div className="w-7 h-1 bg-gray-200 rounded" />
+                  </div>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-gray-900 mb-1">
+                    Create with Keywords
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Create SEO-optimized content based on keywords AI models
+                    search for in your industry.
+                  </p>
+                  <button
+                    onClick={() => setCurrentStep("keyword")}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Create with Keywords
+                  </button>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-gray-900 mb-1">
-                  Create with Keywords
-                </h3>
-                <p className="text-sm text-gray-500 mb-4">
-                  Create SEO-optimized content based on keywords AI models
-                  search for in your industry.
-                </p>
-                <button
-                  onClick={() => setCurrentStep("keyword")}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  Create with Keywords
-                </button>
+          {/* Create with Topics Card */}
+          <div className="flex-1 max-w-md">
+            <div className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 transition-colors bg-white h-full">
+              <div className="flex items-start gap-4">
+                {/* Icon placeholder */}
+                <div className="w-16 h-20 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-1.5 flex-shrink-0">
+                  <MessageSquare className="w-4 h-4 text-gray-400" />
+                  <div className="space-y-1">
+                    <div className="w-8 h-1 bg-gray-300 rounded" />
+                    <div className="w-6 h-1 bg-gray-200 rounded" />
+                    <div className="w-7 h-1 bg-gray-200 rounded" />
+                  </div>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-gray-900 mb-1">
+                    Create with Topics
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Create AEO content based on topics and prompts with
+                    top-cited pages as references.
+                  </p>
+                  <button
+                    onClick={() => setCurrentStep("topics-template")}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    Create with Topics
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -482,6 +538,14 @@ export function ContentSection({
         onOpenChange={(open) => !open && closeModals()}
         onBack={() => setCurrentStep("config")}
         onSelect={handleTemplateSelected}
+      />
+
+      {/* Topics Template Selection Modal */}
+      <TemplateSelectionModal
+        open={currentStep === "topics-template"}
+        onOpenChange={(open) => !open && closeModals()}
+        onBack={closeModals}
+        onSelect={handleTopicsTemplateSelected}
       />
 
       {/* Generating overlay */}

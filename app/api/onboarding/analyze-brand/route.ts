@@ -57,7 +57,7 @@ async function analyzeWebsite(domain: string): Promise<BrandAnalysis | null> {
 
 Then generate:
 
-A) 5 questions that user might ask about that product category **NOT about the brand itself** These prompts should:
+A) 3 questions that user might ask about that product category **NOT about the brand itself** These prompts should:
 - Have natural, HUMAN-LIKE phrasing. occasionally include slight imprecision or casual wording
 - These prompts should have absolutely zero resemblance to ai generated text. No, em-dashes
 - Cover different intents: recommendations, comparisons, how-to questions, best options
@@ -78,7 +78,7 @@ IMPORTANT: Only fetch from the provided domain
 
 Think carefully and deeply ponder the fact that I'm asking you to return only JSON in your final response. So while you're thinking, think about your output being JSON only. Do not output anything except for JSON. DO NOT output any paragraphs explaining what you're doing. DO  NOT give an overview. RETURN JSON. I want you to ponder this while you're thinking. It is important that your response only includes json in the form below
 
-{"brandName": "Example Corp", "industry": "Category Name", "description": "Brief description", "prompts": ["prompt 1", "prompt 2", "prompt 3", "prompt 4", "prompt 5"], "topics": [{"name": "Topic Name", "description": "Brief description of what this topic covers"}, ...]}`;
+{"brandName": "Example Corp", "industry": "Category Name", "description": "Brief description", "prompts": ["prompt 1", "prompt 2", "prompt 3"], "topics": [{"name": "Topic Name", "description": "Brief description of what this topic covers"}, ...]}`;
 
   try {
     const response = await fetch(
@@ -143,8 +143,8 @@ Think carefully and deeply ponder the fact that I'm asking you to return only JS
         return null;
       }
 
-      // Ensure we have exactly 5 prompts
-      analysis.prompts = analysis.prompts.slice(0, 5);
+      // Ensure we have exactly 3 prompts
+      analysis.prompts = analysis.prompts.slice(0, 3);
 
       // Validate and normalize topics
       if (!analysis.topics || !Array.isArray(analysis.topics)) {

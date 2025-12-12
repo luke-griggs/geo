@@ -63,6 +63,7 @@ interface BulkPrompt {
     | "problem_solution";
   location?: string;
   isActive?: boolean;
+  topicId?: string;
 }
 
 // POST /api/organizations/[organizationId]/domains/[domainId]/prompts/bulk - Bulk create prompts
@@ -119,6 +120,7 @@ export async function POST(
       category: p.category || ("brand" as const),
       location: p.location || null,
       isActive: p.isActive !== false,
+      topicId: p.topicId || null,
       domainId,
     }));
 
