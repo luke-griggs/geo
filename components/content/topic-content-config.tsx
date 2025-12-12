@@ -145,6 +145,8 @@ export function TopicContentConfig({
     } catch (error) {
       console.error("Error fetching citations:", error);
       setCitations([]);
+      setSelectedCitations([]);
+      setCitationPage(1);
     } finally {
       setIsLoadingCitations(false);
     }

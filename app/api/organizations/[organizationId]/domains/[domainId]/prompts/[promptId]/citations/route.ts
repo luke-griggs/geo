@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/db";
-import { prompt, domain, organization, promptRun } from "@/db/schema";
+import {
+  prompt,
+  domain,
+  organization,
+  organizationMember,
+  promptRun,
+} from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -25,6 +31,28 @@ interface AggregatedCitation {
   isEarned: boolean;
 }
 
+// Helper to check organization access (creator or member)
+async function checkOrgAccess(organizationId: string, userId: string) {
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+  });
+
+  if (!org) return null;
+
+  // Check if user is creator
+  if (org.userId === userId) return org;
+
+  // Check if user is a member
+  const membership = await db.query.organizationMember.findFirst({
+    where: and(
+      eq(organizationMember.organizationId, organizationId),
+      eq(organizationMember.userId, userId)
+    ),
+  });
+
+  return membership ? org : null;
+}
+
 // Helper to verify ownership
 async function verifyOwnership(
   organizationId: string,
@@ -32,14 +60,9 @@ async function verifyOwnership(
   promptId: string,
   userId: string
 ) {
-  const orgExists = await db.query.organization.findFirst({
-    where: and(
-      eq(organization.id, organizationId),
-      eq(organization.userId, userId)
-    ),
-  });
+  const org = await checkOrgAccess(organizationId, userId);
 
-  if (!orgExists) {
+  if (!org) {
     return { error: "Organization not found", status: 404 };
   }
 
