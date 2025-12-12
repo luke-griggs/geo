@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { keyword } = body;
+    const { keyword, topic } = body;
 
     if (!keyword) {
       return NextResponse.json(
@@ -26,32 +26,38 @@ export async function POST(request: NextRequest) {
 
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
+      console.warn("GROQ_API_KEY not configured, returning fallback titles");
       // Return fallback titles if API not configured
       return NextResponse.json({
-        titles: [
-          `${
-            keyword.charAt(0).toUpperCase() + keyword.slice(1)
-          }: A Complete Guide`,
-          `Top 10 ${
-            keyword.charAt(0).toUpperCase() + keyword.slice(1)
-          } You Need to Know`,
-          `The Ultimate Guide to ${
-            keyword.charAt(0).toUpperCase() + keyword.slice(1)
-          }`,
-        ],
+        titles: generateFallbackTitles(keyword),
       });
     }
 
-    const systemPrompt = `You are an SEO expert that creates compelling, click-worthy article titles. Generate 5 unique title suggestions for the given keyword. The titles should be:
-- Engaging and click-worthy
-- SEO-optimized (include the keyword naturally)
-- Varied in style (some listicles, some guides, some questions)
-- Between 40-60 characters when possible
+    const systemPrompt = `You are a senior content strategist. Generate 3 article titles for the given topic.
 
-Return ONLY a JSON array of title strings. No explanations, no markdown.
+CRITICAL RULES:
+- NO generic patterns like "Ultimate Guide", "Everything You Need to Know", "Complete Guide", "X vs Y Showdown", "How X Stack Up"
+- NO listicle formats like "Top 10", "Best X of 2024"
+- NO question formats unless genuinely compelling
+- Each title must have a SPECIFIC angle, insight, or hook that makes someone want to read
+- Write like a journalist, not an SEO robot
+- Be direct and confident - avoid hedging words
 
-Example output:
-["Title 1", "Title 2", "Title 3", "Title 4", "Title 5"]`;
+Good examples:
+- "The Hidden Cost of Cloud Migration Nobody Talks About"
+- "Why Your API Gateway Is Probably Overkill"  
+- "I Tested 50 LLMs. Here's What Actually Matters."
+
+Bad examples (DO NOT write like this):
+- "Cloud Migration: A Complete Guide"
+- "API Gateways Explained: Everything You Need to Know"
+- "Comparing the Best LLMs of 2024"
+
+Return a JSON object: {"titles": ["Title 1", "Title 2", "Title 3"]}`;
+
+    const userMessage = topic
+      ? `Topic: ${topic}\nPrompt/Keyword: ${keyword}`
+      : `Keyword: ${keyword}`;
 
     const response = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -65,10 +71,10 @@ Example output:
           model: "meta-llama/llama-4-maverick-17b-128e-instruct",
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: `Keyword: ${keyword}` },
+            { role: "user", content: userMessage },
           ],
-          temperature: 0.8,
-          max_completion_tokens: 2048,
+          temperature: 0.9,
+          max_tokens: 1024,
           response_format: { type: "json_object" },
         }),
       }
@@ -79,17 +85,7 @@ Example output:
       console.error("Groq API error:", error);
       // Return fallback
       return NextResponse.json({
-        titles: [
-          `${
-            keyword.charAt(0).toUpperCase() + keyword.slice(1)
-          }: A Complete Guide`,
-          `Top 10 ${
-            keyword.charAt(0).toUpperCase() + keyword.slice(1)
-          } You Need to Know`,
-          `The Ultimate Guide to ${
-            keyword.charAt(0).toUpperCase() + keyword.slice(1)
-          }`,
-        ],
+        titles: generateFallbackTitles(keyword),
       });
     }
 
@@ -97,39 +93,30 @@ Example output:
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
+      console.error("No content in Groq response");
       return NextResponse.json({
-        titles: [
-          `${
-            keyword.charAt(0).toUpperCase() + keyword.slice(1)
-          }: A Complete Guide`,
-        ],
+        titles: generateFallbackTitles(keyword),
       });
     }
 
     try {
-      const cleanedContent = content
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "")
-        .trim();
+      const parsed = JSON.parse(content);
 
-      const titles = JSON.parse(cleanedContent);
+      // Handle both array and object with titles key
+      const titles = Array.isArray(parsed) ? parsed : parsed.titles;
 
-      if (Array.isArray(titles)) {
+      if (Array.isArray(titles) && titles.length > 0) {
         return NextResponse.json({
-          titles: titles.filter((t) => typeof t === "string").slice(0, 5),
+          titles: titles.filter((t) => typeof t === "string").slice(0, 3),
         });
       }
-    } catch {
-      console.error("Failed to parse title response:", content);
+    } catch (parseError) {
+      console.error("Failed to parse title response:", content, parseError);
     }
 
     // Fallback
     return NextResponse.json({
-      titles: [
-        `${
-          keyword.charAt(0).toUpperCase() + keyword.slice(1)
-        }: A Complete Guide`,
-      ],
+      titles: generateFallbackTitles(keyword),
     });
   } catch (error) {
     console.error("Error generating titles:", error);
@@ -140,3 +127,15 @@ Example output:
   }
 }
 
+// Generate varied fallback titles when API is unavailable
+function generateFallbackTitles(keyword: string): string[] {
+  const capitalizedKeyword = keyword.charAt(0).toUpperCase() + keyword.slice(1);
+
+  const templates = [
+    `What Most People Get Wrong About ${capitalizedKeyword}`,
+    `The Case for Rethinking ${capitalizedKeyword}`,
+    `${capitalizedKeyword}: A Practical Take`,
+  ];
+
+  return templates;
+}

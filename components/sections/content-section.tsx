@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import {
   Sparkles,
   FileText,
@@ -11,6 +10,7 @@ import {
   Loader2,
   RefreshCw,
   MessageSquare,
+  Plus,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -22,6 +22,7 @@ import { KeywordSelectionModal } from "@/components/content/keyword-selection-mo
 import { ContentConfigModal } from "@/components/content/content-config-modal";
 import { TemplateSelectionModal } from "@/components/content/template-selection-modal";
 import { ContentProjectView } from "@/components/content/content-project-view";
+import { TopicContentConfig } from "@/components/content/topic-content-config";
 
 interface SerpResult {
   url: string;
@@ -56,7 +57,8 @@ type ModalStep =
   | "template"
   | "generating"
   | "view"
-  | "topics-template";
+  | "topics-template"
+  | "topics-config";
 
 function StatusBadge({ status }: { status: ContentProject["status"] }) {
   const statusStyles = {
@@ -117,7 +119,6 @@ export function ContentSection({
   domainId,
   domainName,
 }: ContentSectionProps) {
-  const router = useRouter();
   const [projects, setProjects] = useState<ContentProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState<ModalStep | null>(null);
@@ -133,6 +134,9 @@ export function ContentSection({
     null
   );
   const [isGenerating, setIsGenerating] = useState(false);
+  const [topicsTemplate, setTopicsTemplate] = useState<
+    "smart_suggestion" | "blog_post" | "listicle"
+  >("smart_suggestion");
 
   // Fetch projects on mount
   useEffect(() => {
@@ -248,11 +252,67 @@ export function ContentSection({
   const handleTopicsTemplateSelected = (
     template: "smart_suggestion" | "blog_post" | "listicle"
   ) => {
-    // Navigate to the topics configuration page with the selected template
-    router.push(
-      `/organizations/${organizationId}/domains/${domainId}/content/topics?template=${template}`
-    );
-    closeModals();
+    setTopicsTemplate(template);
+    setCurrentStep("topics-config");
+  };
+
+  const handleTopicsGenerate = async (config: {
+    topicId: string;
+    promptId: string;
+    platforms: string[];
+    citations: string[];
+    title: string;
+    template: string;
+  }) => {
+    setIsGenerating(true);
+
+    try {
+      // Create content project
+      const createResponse = await fetch(
+        `/api/organizations/${organizationId}/domains/${domainId}/content`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            keyword: config.title,
+            title: config.title,
+            template: config.template,
+            selectedPages: config.citations,
+          }),
+        }
+      );
+
+      if (!createResponse.ok) {
+        throw new Error("Failed to create content project");
+      }
+
+      const { project } = await createResponse.json();
+
+      // Generate content
+      const generateResponse = await fetch(
+        `/api/organizations/${organizationId}/domains/${domainId}/content/${project.id}/generate`,
+        { method: "POST" }
+      );
+
+      if (!generateResponse.ok) {
+        throw new Error("Failed to generate content");
+      }
+
+      const { project: updatedProject } = await generateResponse.json();
+
+      // Show the result
+      setViewingProject(updatedProject);
+      setCurrentStep("view");
+
+      // Refresh project list
+      fetchProjects();
+    } catch (error) {
+      console.error("Error generating content:", error);
+      alert("Failed to generate content. Please try again.");
+      setCurrentStep(null);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const closeModals = () => {
@@ -264,6 +324,80 @@ export function ContentSection({
   };
 
   const totalItems = projects.length;
+
+  // If we're in topics-config mode, show the inline configuration view
+  if (currentStep === "topics-config") {
+    return (
+      <div className="flex flex-col h-full -m-8">
+        {/* Back button header */}
+        <div className="px-6 py-4 border-b border-gray-200 bg-white">
+          <button
+            onClick={() => setCurrentStep(null)}
+            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back
+          </button>
+        </div>
+
+        {/* Main content area */}
+        <div className="flex flex-1 min-h-0">
+          {/* Left sidebar - Configuration */}
+          <TopicContentConfig
+            organizationId={organizationId}
+            domainId={domainId}
+            template={topicsTemplate}
+            onBack={() => setCurrentStep(null)}
+            onGenerate={handleTopicsGenerate}
+          />
+
+          {/* Right side - Preview/Placeholder */}
+          <div className="flex-1 flex items-center justify-center bg-gray-50 p-8">
+            {isGenerating ? (
+              <div className="text-center">
+                <Loader2 className="w-12 h-12 animate-spin text-[#6366f1] mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Generating your content
+                </h3>
+                <p className="text-sm text-gray-500">
+                  We're analyzing top-cited pages and writing your article. This
+                  may take a minute...
+                </p>
+              </div>
+            ) : (
+              <div className="text-center max-w-md">
+                {/* Placeholder illustration */}
+                <div className="relative inline-block mb-6">
+                  <div className="w-32 h-40 bg-white rounded-lg border border-gray-200 shadow-sm mx-auto relative">
+                    {/* Document lines */}
+                    <div className="absolute top-6 left-4 right-4 space-y-2">
+                      <div className="h-2 bg-gray-200 rounded w-3/4" />
+                      <div className="h-2 bg-gray-100 rounded w-full" />
+                      <div className="h-2 bg-gray-100 rounded w-5/6" />
+                      <div className="h-2 bg-gray-100 rounded w-full" />
+                      <div className="h-2 bg-gray-100 rounded w-2/3" />
+                    </div>
+                  </div>
+                  {/* Plus badge */}
+                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-white rounded-lg border border-gray-200 shadow-sm flex items-center justify-center">
+                    <Plus className="w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Begin by setting up your content configuration
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Enter key details in the left sidebar to optimize your content
+                  for AEO.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -282,7 +416,10 @@ export function ContentSection({
         <div className="flex gap-4">
           {/* Create with Keywords Card */}
           <div className="flex-1 max-w-md">
-            <div className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 transition-colors bg-white h-full">
+            <button
+              onClick={() => setCurrentStep("keyword")}
+              className="w-full text-left border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-sm transition-all bg-white h-full cursor-pointer"
+            >
               <div className="flex items-start gap-4">
                 {/* Icon placeholder */}
                 <div className="w-16 h-20 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-1.5 flex-shrink-0">
@@ -302,21 +439,21 @@ export function ContentSection({
                     Create SEO-optimized content based on keywords AI models
                     search for in your industry.
                   </p>
-                  <button
-                    onClick={() => setCurrentStep("keyword")}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-                  >
+                  <span className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg">
                     <Sparkles className="w-4 h-4" />
                     Create with Keywords
-                  </button>
+                  </span>
                 </div>
               </div>
-            </div>
+            </button>
           </div>
 
           {/* Create with Topics Card */}
           <div className="flex-1 max-w-md">
-            <div className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 transition-colors bg-white h-full">
+            <button
+              onClick={() => setCurrentStep("topics-template")}
+              className="w-full text-left border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-sm transition-all bg-white h-full cursor-pointer"
+            >
               <div className="flex items-start gap-4">
                 {/* Icon placeholder */}
                 <div className="w-16 h-20 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-1.5 flex-shrink-0">
@@ -336,16 +473,13 @@ export function ContentSection({
                     Create AEO content based on topics and prompts with
                     top-cited pages as references.
                   </p>
-                  <button
-                    onClick={() => setCurrentStep("topics-template")}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-                  >
+                  <span className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg">
                     <MessageSquare className="w-4 h-4" />
                     Create with Topics
-                  </button>
+                  </span>
                 </div>
               </div>
-            </div>
+            </button>
           </div>
         </div>
       </div>

@@ -30,7 +30,10 @@ export function AccountStep() {
   } = useOnboarding();
 
   const isAccountValid =
-    firstName.trim() && lastName.trim() && password.length >= 8 && termsAccepted;
+    firstName.trim() &&
+    lastName.trim() &&
+    password.length >= 8 &&
+    termsAccepted;
 
   const handleAccountSubmit = async () => {
     if (!firstName || !lastName || !password || !termsAccepted) return;

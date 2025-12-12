@@ -8,10 +8,7 @@ import {
   BookOpen,
   HelpCircle,
   BarChart2,
-  Linkedin,
-  ShoppingBag,
   Clock,
-  ChevronLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -22,12 +19,7 @@ import {
 } from "@/components/ui/dialog";
 
 type TemplateType = "smart_suggestion" | "blog_post" | "listicle";
-type TemplateCategory =
-  | "all"
-  | "informational"
-  | "comparative"
-  | "social"
-  | "transactional";
+type TemplateCategory = "all" | "informational" | "comparative";
 
 interface Template {
   id: TemplateType;
@@ -37,6 +29,7 @@ interface Template {
   icon: React.ReactNode;
   available: boolean;
   isNew?: boolean;
+  isRecommended?: boolean;
 }
 
 const templates: Template[] = [
@@ -48,6 +41,7 @@ const templates: Template[] = [
     category: "all",
     icon: <Sparkles className="h-6 w-6" />,
     available: true,
+    isRecommended: true,
   },
   {
     id: "blog_post",
@@ -96,49 +90,27 @@ const comingSoonTemplates: Omit<Template, "id"> & { id: string }[] = [
     icon: <BarChart2 className="h-6 w-6" />,
     available: false,
   },
-  {
-    id: "linkedin",
-    name: "LinkedIn Post",
-    description: "Post in a LinkedIn-style format to engage your audience.",
-    category: "social",
-    icon: <Linkedin className="h-6 w-6" />,
-    available: false,
-  },
-  {
-    id: "product_listing",
-    name: "Product Listing",
-    description: "List the features and benefits of your product or service.",
-    category: "transactional",
-    icon: <ShoppingBag className="h-6 w-6" />,
-    available: false,
-  },
 ];
 
 interface TemplateSelectionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onBack: () => void;
+  onBack?: () => void;
   onSelect: (template: TemplateType) => void;
 }
 
 export function TemplateSelectionModal({
   open,
   onOpenChange,
-  onBack,
   onSelect,
 }: TemplateSelectionModalProps) {
   const [selectedCategory, setSelectedCategory] =
     useState<TemplateCategory>("all");
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateType | null>(
-    null
-  );
 
   const categories: { id: TemplateCategory; label: string }[] = [
     { id: "all", label: "Show all" },
     { id: "informational", label: "Informational" },
     { id: "comparative", label: "Comparative" },
-    { id: "social", label: "Social" },
-    { id: "transactional", label: "Transactional" },
   ];
 
   const filteredTemplates =
@@ -153,15 +125,13 @@ export function TemplateSelectionModal({
       ? comingSoonTemplates
       : comingSoonTemplates.filter((t) => t.category === selectedCategory);
 
-  const handleUseTemplate = () => {
-    if (selectedTemplate) {
-      onSelect(selectedTemplate);
-    }
+  const handleTemplateClick = (templateId: TemplateType) => {
+    onSelect(templateId);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[1000px] p-0 gap-0 h-[680px] flex flex-col">
+      <DialogContent className="sm:max-w-[1000px] p-0 gap-0 flex flex-col">
         <DialogHeader className="p-8 pb-6 flex-shrink-0 border-b border-gray-100">
           <DialogTitle className="text-xl font-semibold">
             Generate content using templates
@@ -169,9 +139,9 @@ export function TemplateSelectionModal({
         </DialogHeader>
 
         {/* Main content - no sidebar */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1">
           {/* Categories */}
-          <div className="px-8 py-5 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <div className="px-8 py-5 border-b border-gray-100">
             <div className="flex items-center gap-3">
               {categories.map((cat) => (
                 <button
@@ -195,17 +165,20 @@ export function TemplateSelectionModal({
             <div className="grid grid-cols-3 gap-6">
               {/* Available templates */}
               {filteredTemplates.map((template) => (
-                <div
+                <button
                   key={template.id}
-                  onClick={() => setSelectedTemplate(template.id)}
+                  onClick={() => handleTemplateClick(template.id)}
                   className={cn(
                     "relative flex flex-col items-center p-8 rounded-xl border-2 transition-all text-center cursor-pointer",
-                    selectedTemplate === template.id
-                      ? "border-[#6366f1] bg-[#6366f1]/5"
-                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    "border-gray-200 hover:border-[#6366f1] hover:bg-[#6366f1]/5 hover:shadow-sm"
                   )}
                 >
                   {/* Badge */}
+                  {template.isRecommended && (
+                    <span className="absolute top-4 left-4 text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                      Recommended
+                    </span>
+                  )}
                   {template.isNew && (
                     <span className="absolute top-4 left-4 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
                       New
@@ -228,18 +201,7 @@ export function TemplateSelectionModal({
                   <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
                     {template.description}
                   </p>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedTemplate(template.id);
-                      onSelect(template.id);
-                    }}
-                    className="mt-5 w-full px-4 py-2.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Use this template
-                  </button>
-                </div>
+                </button>
               ))}
 
               {/* Coming soon templates */}
@@ -277,38 +239,6 @@ export function TemplateSelectionModal({
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between px-8 py-5 border-t border-gray-100 bg-gray-50/50 rounded-b-xl flex-shrink-0">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back
-          </button>
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => onOpenChange(false)}
-              className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleUseTemplate}
-              disabled={!selectedTemplate}
-              className={cn(
-                "px-6 py-2.5 text-sm font-medium rounded-lg transition-colors",
-                selectedTemplate
-                  ? "bg-[#6366f1] text-white hover:bg-[#4f46e5]"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
-              )}
-            >
-              Generate Content
-            </button>
           </div>
         </div>
       </DialogContent>

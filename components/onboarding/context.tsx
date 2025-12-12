@@ -6,7 +6,6 @@ import {
   useState,
   useCallback,
   useEffect,
-  useRef,
   type ReactNode,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -242,13 +241,90 @@ interface StoredProgress {
   topicsWithPrompts?: TopicWithPrompts[];
 }
 
+// Compute initial state from URL params and localStorage (runs once on mount)
+function getInitialState(searchParams: URLSearchParams) {
+  const stepParam = searchParams.get("step") as OnboardingStep | null;
+
+  // Default initial state
+  const defaults = {
+    currentStep: "email" as OnboardingStep,
+    website: "",
+    brandDescription: "",
+    analysisResult: null as AnalysisResult | null,
+    selectedTopics: new Set<string>(),
+    customTopics: [] as TopicSuggestion[],
+    topicsWithPrompts: [] as TopicWithPrompts[],
+  };
+
+  // Only run on client
+  if (typeof window === "undefined") return defaults;
+
+  // Check URL param first
+  if (stepParam && STEP_ORDER.includes(stepParam)) {
+    if (RESTORABLE_STEPS.includes(stepParam)) {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const progress: StoredProgress = JSON.parse(stored);
+          return {
+            currentStep: stepParam,
+            website: progress.website ?? "",
+            brandDescription: progress.brandDescription ?? "",
+            analysisResult: progress.analysisResult ?? null,
+            selectedTopics: new Set(progress.selectedTopics ?? []),
+            customTopics: progress.customTopics ?? [],
+            topicsWithPrompts: progress.topicsWithPrompts ?? [],
+          };
+        } catch {
+          // Invalid stored data, use defaults
+        }
+      }
+    } else {
+      return { ...defaults, currentStep: stepParam };
+    }
+  }
+
+  // Check localStorage for last step
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    try {
+      const progress: StoredProgress = JSON.parse(stored);
+      if (RESTORABLE_STEPS.includes(progress.step)) {
+        // Update URL without triggering navigation
+        window.history.replaceState(
+          null,
+          "",
+          `/onboarding?step=${progress.step}`
+        );
+        return {
+          currentStep: progress.step,
+          website: progress.website ?? "",
+          brandDescription: progress.brandDescription ?? "",
+          analysisResult: progress.analysisResult ?? null,
+          selectedTopics: new Set(progress.selectedTopics ?? []),
+          customTopics: progress.customTopics ?? [],
+          topicsWithPrompts: progress.topicsWithPrompts ?? [],
+        };
+      }
+    } catch {
+      // Invalid stored data, use defaults
+    }
+  }
+
+  return defaults;
+}
+
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initializedRef = useRef(false);
+
+  // Compute initial state once using lazy initialization
+  const [initialState] = useState(() => getInitialState(searchParams));
 
   // Step state
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>("email");
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>(
+    initialState.currentStep
+  );
   const [direction, setDirection] = useState<"left" | "right">("right");
 
   // Loading/Error state
@@ -275,29 +351,35 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [canResend, setCanResend] = useState(false);
 
   // Brand
-  const [website, setWebsite] = useState("");
-  const [brandDescription, setBrandDescription] = useState("");
+  const [website, setWebsite] = useState(initialState.website);
+  const [brandDescription, setBrandDescription] = useState(
+    initialState.brandDescription
+  );
   const [websiteError, setWebsiteError] = useState<string | null>(null);
   const [isValidatingDomain, setIsValidatingDomain] = useState(false);
 
   // Analysis
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
-    null
+    initialState.analysisResult
   );
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisMessageIndex, setAnalysisMessageIndex] = useState(0);
 
   // Topics
-  const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
-  const [customTopics, setCustomTopics] = useState<TopicSuggestion[]>([]);
+  const [selectedTopics, setSelectedTopics] = useState<Set<string>>(
+    initialState.selectedTopics
+  );
+  const [customTopics, setCustomTopics] = useState<TopicSuggestion[]>(
+    initialState.customTopics
+  );
   const [isAddingCustomTopic, setIsAddingCustomTopic] = useState(false);
   const [customTopicInput, setCustomTopicInput] = useState("");
 
   // Prompts
-  const [topicsWithPrompts, setTopicsWithPrompts] = useState<TopicWithPrompts[]>(
-    []
-  );
+  const [topicsWithPrompts, setTopicsWithPrompts] = useState<
+    TopicWithPrompts[]
+  >(initialState.topicsWithPrompts);
   const [isGeneratingPrompts, setIsGeneratingPrompts] = useState(false);
   const [isSubmittingPrompts, setIsSubmittingPrompts] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -329,70 +411,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     0
   );
 
-  // Initialize from URL params or localStorage
-  useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
-    // Check URL param first
-    const stepParam = searchParams.get("step") as OnboardingStep | null;
-    if (stepParam && STEP_ORDER.includes(stepParam)) {
-      // Only restore post-auth steps if we have stored data
-      if (RESTORABLE_STEPS.includes(stepParam)) {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          try {
-            const progress: StoredProgress = JSON.parse(stored);
-            // Restore state
-            if (progress.website) setWebsite(progress.website);
-            if (progress.brandDescription)
-              setBrandDescription(progress.brandDescription);
-            if (progress.analysisResult)
-              setAnalysisResult(progress.analysisResult);
-            if (progress.selectedTopics)
-              setSelectedTopics(new Set(progress.selectedTopics));
-            if (progress.customTopics) setCustomTopics(progress.customTopics);
-            if (progress.topicsWithPrompts)
-              setTopicsWithPrompts(progress.topicsWithPrompts);
-            setCurrentStep(stepParam);
-            return;
-          } catch {
-            // Invalid stored data, start fresh
-          }
-        }
-      } else {
-        setCurrentStep(stepParam);
-        return;
-      }
-    }
-
-    // Check localStorage for last step
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const progress: StoredProgress = JSON.parse(stored);
-        if (RESTORABLE_STEPS.includes(progress.step)) {
-          // Restore state
-          if (progress.website) setWebsite(progress.website);
-          if (progress.brandDescription)
-            setBrandDescription(progress.brandDescription);
-          if (progress.analysisResult)
-            setAnalysisResult(progress.analysisResult);
-          if (progress.selectedTopics)
-            setSelectedTopics(new Set(progress.selectedTopics));
-          if (progress.customTopics) setCustomTopics(progress.customTopics);
-          if (progress.topicsWithPrompts)
-            setTopicsWithPrompts(progress.topicsWithPrompts);
-          setCurrentStep(progress.step);
-          // Update URL
-          window.history.replaceState(null, "", `/onboarding?step=${progress.step}`);
-        }
-      } catch {
-        // Invalid stored data, start fresh
-      }
-    }
-  }, [searchParams]);
-
   // Save progress to localStorage when on restorable steps
   useEffect(() => {
     if (RESTORABLE_STEPS.includes(currentStep)) {
@@ -417,15 +435,19 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     topicsWithPrompts,
   ]);
 
-  // Pre-select first 5 topics when analysis completes
-  useEffect(() => {
-    if (analysisResult?.topics && analysisResult.topics.length > 0) {
-      const initialTopics = new Set(
-        analysisResult.topics.slice(0, 5).map((t) => t.name)
-      );
-      setSelectedTopics(initialTopics);
-    }
-  }, [analysisResult]);
+  // Wrapper for setAnalysisResult that also pre-selects first 5 topics
+  const handleSetAnalysisResult = useCallback(
+    (result: AnalysisResult | null) => {
+      setAnalysisResult(result);
+      if (result?.topics && result.topics.length > 0) {
+        const initialTopics = new Set(
+          result.topics.slice(0, 5).map((t) => t.name)
+        );
+        setSelectedTopics(initialTopics);
+      }
+    },
+    []
+  );
 
   // Step navigation with history
   const goToStep = useCallback(
@@ -567,7 +589,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     isAnalyzing,
     setIsAnalyzing,
     analysisResult,
-    setAnalysisResult,
+    setAnalysisResult: handleSetAnalysisResult,
     analysisError,
     setAnalysisError,
     analysisMessageIndex,

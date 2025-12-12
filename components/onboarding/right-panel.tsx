@@ -68,11 +68,7 @@ function IndustryRankingCard() {
     }
   } else {
     // User is ranked 6+ (or unranked), show top 5 competitors then user
-    for (
-      let i = 0;
-      i < Math.min(5, analysisResult.competitors.length);
-      i++
-    ) {
+    for (let i = 0; i < Math.min(5, analysisResult.competitors.length); i++) {
       displayItems.push({
         rank: i + 1,
         name: analysisResult.competitors[i].name,
@@ -292,16 +288,8 @@ function DailyPromptsDecoration() {
                     x2="0%"
                     y2="100%"
                   >
-                    <stop
-                      offset="0%"
-                      stopColor="#6366f1"
-                      stopOpacity="0.15"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="#6366f1"
-                      stopOpacity="0"
-                    />
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.15" />
+                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
                   </linearGradient>
                 </defs>
 
