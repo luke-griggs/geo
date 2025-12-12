@@ -414,68 +414,71 @@ export function ContentSection({
 
         {/* Cards Container */}
         <div className="flex gap-4">
-          {/* Create with Keywords Card */}
-          <div className="flex-1 max-w-md">
+          {/* Create with Topics Card */}
+          <div className="flex-1 max-w-lg">
             <button
-              onClick={() => setCurrentStep("keyword")}
-              className="w-full text-left border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-sm transition-all bg-white h-full cursor-pointer"
+              onClick={() => setCurrentStep("topics-template")}
+              className="relative w-full text-left border border-gray-200 rounded-xl p-8 hover:border-gray-300 hover:shadow-sm transition-all bg-white h-full cursor-pointer"
             >
-              <div className="flex items-start gap-4">
+              <span className="absolute top-4 right-4 text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                Recommended
+              </span>
+              <div className="flex items-start gap-5">
                 {/* Icon placeholder */}
-                <div className="w-16 h-20 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-1.5 flex-shrink-0">
-                  <Sparkles className="w-4 h-4 text-gray-400" />
-                  <div className="space-y-1">
-                    <div className="w-8 h-1 bg-gray-300 rounded" />
-                    <div className="w-6 h-1 bg-gray-200 rounded" />
-                    <div className="w-7 h-1 bg-gray-200 rounded" />
+                <div className="w-24 h-28 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-2.5 flex-shrink-0">
+                  <MessageSquare className="w-6 h-6 text-gray-400" />
+                  <div className="space-y-1.5">
+                    <div className="w-12 h-1.5 bg-gray-300 rounded" />
+                    <div className="w-9 h-1.5 bg-gray-200 rounded" />
+                    <div className="w-10 h-1.5 bg-gray-200 rounded" />
                   </div>
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-gray-900 mb-1">
-                    Create with Keywords
+                  <h3 className="font-medium text-gray-900 mb-2 text-base">
+                    Create with Topics
                   </h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Create SEO-optimized content based on keywords AI models
-                    search for in your industry.
+                  <p className="text-sm text-gray-500 mb-5 leading-relaxed">
+                    Create AEO content based on topics and prompts with
+                    top-cited pages as references.
                   </p>
-                  <span className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg">
-                    <Sparkles className="w-4 h-4" />
-                    Create with Keywords
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg">
+                    <MessageSquare className="w-4 h-4" />
+                    Create with Topics
                   </span>
                 </div>
               </div>
             </button>
           </div>
 
-          {/* Create with Topics Card */}
-          <div className="flex-1 max-w-md">
+          {/* Create with Keywords Card */}
+          <div className="flex-1 max-w-lg">
             <button
-              onClick={() => setCurrentStep("topics-template")}
-              className="w-full text-left border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-sm transition-all bg-white h-full cursor-pointer"
+              onClick={() => setCurrentStep("keyword")}
+              className="w-full text-left border border-gray-200 rounded-xl p-8 hover:border-gray-300 hover:shadow-sm transition-all bg-white h-full cursor-pointer"
             >
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-5">
                 {/* Icon placeholder */}
-                <div className="w-16 h-20 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-1.5 flex-shrink-0">
-                  <MessageSquare className="w-4 h-4 text-gray-400" />
-                  <div className="space-y-1">
-                    <div className="w-8 h-1 bg-gray-300 rounded" />
-                    <div className="w-6 h-1 bg-gray-200 rounded" />
-                    <div className="w-7 h-1 bg-gray-200 rounded" />
+                <div className="w-24 h-28 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-2.5 flex-shrink-0">
+                  <Sparkles className="w-6 h-6 text-gray-400" />
+                  <div className="space-y-1.5">
+                    <div className="w-12 h-1.5 bg-gray-300 rounded" />
+                    <div className="w-9 h-1.5 bg-gray-200 rounded" />
+                    <div className="w-10 h-1.5 bg-gray-200 rounded" />
                   </div>
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-gray-900 mb-1">
-                    Create with Topics
+                  <h3 className="font-medium text-gray-900 mb-2 text-base">
+                    Create with Keywords
                   </h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Create AEO content based on topics and prompts with
-                    top-cited pages as references.
+                  <p className="text-sm text-gray-500 mb-5 leading-relaxed">
+                    Create SEO-optimized content based on keywords AI models
+                    search for in your industry.
                   </p>
-                  <span className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg">
-                    <MessageSquare className="w-4 h-4" />
-                    Create with Topics
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg">
+                    <Sparkles className="w-4 h-4" />
+                    Create with Keywords
                   </span>
                 </div>
               </div>

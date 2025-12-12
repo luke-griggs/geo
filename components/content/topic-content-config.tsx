@@ -847,34 +847,26 @@ export function TopicContentConfig({
         </div>
 
         {/* Brand Kit (disabled) */}
-        <div className="relative opacity-50 pointer-events-none">
+        <div className="relative opacity-50">
           <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <button disabled className="w-full px-4 py-3 bg-white text-left">
+            <div className="w-full px-4 py-3 bg-white text-left">
               <div className="text-sm font-medium text-gray-900 mb-1">
                 Brand Kit (optional)
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-400">Select brand kit</span>
-                <DropdownTriangle isOpen={false} />
-              </div>
-            </button>
+              <span className="text-sm text-gray-400">Coming Soon</span>
+            </div>
           </div>
         </div>
 
         {/* Audience Segment (disabled) */}
-        <div className="relative opacity-50 pointer-events-none">
+        <div className="relative opacity-50">
           <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <button disabled className="w-full px-4 py-3 bg-white text-left">
+            <div className="w-full px-4 py-3 bg-white text-left">
               <div className="text-sm font-medium text-gray-900 mb-1">
                 Audience segment (optional)
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-400">
-                  Select audience segment
-                </span>
-                <DropdownTriangle isOpen={false} />
-              </div>
-            </button>
+              <span className="text-sm text-gray-400">Coming Soon</span>
+            </div>
           </div>
         </div>
 

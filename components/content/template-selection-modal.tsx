@@ -64,7 +64,7 @@ export function TemplateSelectionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] p-0 gap-0 flex flex-col">
+      <DialogContent className="sm:max-w-[1000px] p-0 gap-0 flex flex-col">
         <DialogHeader className="p-8 pb-6 flex-shrink-0">
           <DialogTitle className="text-xl font-semibold">
             Generate content using templates
@@ -79,24 +79,24 @@ export function TemplateSelectionModal({
                 key={template.id}
                 onClick={() => handleTemplateClick(template.id)}
                 className={cn(
-                  "relative flex flex-col items-center p-8 rounded-xl border-2 transition-all text-center cursor-pointer",
+                  "relative flex flex-col items-center px-10 py-12 rounded-xl border-2 transition-all text-center cursor-pointer",
                   "border-gray-200 hover:border-[#6366f1] hover:bg-[#6366f1]/5 hover:shadow-sm"
                 )}
               >
                 {/* Badge */}
                 {template.isRecommended && (
-                  <span className="absolute top-4 left-4 text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                  <span className="absolute top-4 right-4 text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
                     Recommended
                   </span>
                 )}
                 {template.isNew && (
-                  <span className="absolute top-4 left-4 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                  <span className="absolute top-4 right-4 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
                     New
                   </span>
                 )}
 
                 {/* Icon */}
-                <div className="w-20 h-24 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-2 mb-5">
+                <div className="w-20 h-24 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-2 mb-8">
                   <div className="text-gray-400">{template.icon}</div>
                   <div className="space-y-1.5">
                     <div className="w-10 h-1 bg-gray-300 rounded" />
@@ -105,7 +105,7 @@ export function TemplateSelectionModal({
                   </div>
                 </div>
 
-                <h3 className="font-medium text-gray-900 mb-2 text-base">
+                <h3 className="font-medium text-gray-900 mb-3 text-base">
                   {template.name}
                 </h3>
                 <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">

@@ -453,7 +453,7 @@ export function Sidebar({
 
             {/* Action Section */}
             <div className="mt-4">
-              <p className="px-2 py-1.5 text-xs font-medium text-gray-400">
+              <p className="px-2 pb-1.5 text-xs font-medium text-gray-400">
                 Action
               </p>
               <div className="space-y-0.5">
