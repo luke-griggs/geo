@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Sidebar, type NavSection, type Domain } from "@/components/sidebar";
+import { cn } from "@/lib/utils";
 import { OverviewSection } from "@/components/sections/overview-section";
 import { PromptsSection } from "@/components/sections/prompts-section";
 import { VisibilitySection } from "@/components/sections/visibility-section";
@@ -29,6 +30,7 @@ function DashboardContent() {
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const activeSection: NavSection =
     sectionParam &&
@@ -167,10 +169,16 @@ function DashboardContent() {
         selectedDomainId={domain.id}
         onDomainChange={handleDomainChange}
         onDomainAdded={handleDomainAdded}
+        onCollapsedChange={setSidebarCollapsed}
       />
 
       {/* Main content */}
-      <main className="flex-1 ml-64 transition-[margin] duration-200">
+      <main
+        className={cn(
+          "flex-1 transition-[margin] duration-200",
+          sidebarCollapsed ? "ml-[52px]" : "ml-64"
+        )}
+      >
         <div className="p-8 pb-16 h-screen overflow-auto">
           {activeSection === "overview" && (
             <OverviewSection

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { Sidebar, type NavSection } from "@/components/sidebar";
+import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
   Calendar,
@@ -110,6 +111,7 @@ export function PromptDetailView({
     prompt.selectedProviders || ["chatgpt"]
   );
   const [savingModels, setSavingModels] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const availableProviders = [
     { id: "chatgpt", name: "ChatGPT", icon: null, useImage: true },
@@ -272,9 +274,15 @@ export function PromptDetailView({
       <Sidebar
         activeSection={activeSection}
         onSectionChange={handleSectionChange}
+        onCollapsedChange={setSidebarCollapsed}
       />
 
-      <main className="flex-1 ml-64 transition-[margin] duration-200 bg-white">
+      <main
+        className={cn(
+          "flex-1 transition-[margin] duration-200 bg-white",
+          sidebarCollapsed ? "ml-[52px]" : "ml-64"
+        )}
+      >
         <div className="p-8 h-screen overflow-auto">
           {/* Header Navigation */}
           <div className="flex items-center gap-4 mb-6 text-sm text-gray-500">

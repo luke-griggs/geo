@@ -67,6 +67,7 @@ export function VisibilitySection({
   const [error, setError] = useState<string | null>(null);
 
   // Calculate date range from time period
+  // IMPORTANT: Use UTC dates for API to match database UTC timestamps
   const dateRange = useMemo(() => {
     const endDate = new Date();
     let startDate: Date;

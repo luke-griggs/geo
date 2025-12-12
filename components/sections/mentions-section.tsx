@@ -115,18 +115,27 @@ function MiniAreaChart({
 
   // Always generate 7 days of data, filling zeros for missing dates
   const chartData = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     const days: { date: string; mentions: number; citations: number }[] = [];
 
+    // Helper to format date as YYYY-MM-DD in LOCAL time
+    const toLocalDateStr = (d: Date): string => {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        "0"
+      )}-${String(d.getDate()).padStart(2, "0")}`;
+    };
+
     // Create a map of existing data by date
+    // API returns UTC dates - keep as-is for string matching
     const dataMap = new Map(data.map((d) => [d.date, d]));
 
-    // Generate past 7 days
+    // Generate past 7 days in LOCAL time (user's perspective of "today")
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr = toLocalDateStr(date); // Local date string
       const existing = dataMap.get(dateStr);
       days.push({
         date: dateStr,
@@ -347,7 +356,10 @@ function MiniAreaChart({
             const x =
               padding.left +
               (i / Math.max(chartData.length - 1, 1)) * chartWidth;
-            const dateLabel = new Date(d.date).toLocaleDateString("en-US", {
+            // d.date is YYYY-MM-DD - parse and display nicely
+            const [year, month, day] = d.date.split("-").map(Number);
+            const dateObj = new Date(year, month - 1, day);
+            const dateLabel = dateObj.toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
             });
@@ -397,13 +409,15 @@ function MiniAreaChart({
             }}
           >
             <div className="text-sm font-medium text-gray-700 mb-1.5">
-              {new Date(chartData[hoveredIndex].date).toLocaleDateString(
-                "en-US",
-                {
-                  month: "short",
-                  day: "numeric",
-                }
-              )}
+              {(() => {
+                const [year, month, day] = chartData[hoveredIndex].date
+                  .split("-")
+                  .map(Number);
+                return new Date(year, month - 1, day).toLocaleDateString(
+                  "en-US",
+                  { month: "short", day: "numeric" }
+                );
+              })()}
             </div>
             <div className="flex items-center gap-3 text-sm mb-1">
               <div className="flex items-center gap-1.5">
@@ -528,6 +542,7 @@ export function MentionsSection({
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   // Calculate date range
+  // IMPORTANT: Use UTC dates for API to match database UTC timestamps
   const dateRange = useMemo(() => {
     const endDate = new Date();
     let startDate: Date;

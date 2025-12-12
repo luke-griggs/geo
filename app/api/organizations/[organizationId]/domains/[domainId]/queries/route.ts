@@ -126,12 +126,58 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       domainMentions.map((m) => [m.promptRunId, m])
     );
 
+    // Get brand mentions for better mention detection (same as visibility API)
+    const allBrandMentions = await db.query.brandMention.findMany({
+      where: inArray(brandMention.promptRunId, runIds),
+    });
+
+    // Get the user's brand name variants for matching
+    const userBrandName = (
+      domainRecord.name || domainRecord.domain
+    ).toLowerCase();
+    const domainPartsForBrand = domainRecord.domain
+      .toLowerCase()
+      .replace(/^www\./, "")
+      .split(".");
+    const userDomainBase =
+      domainPartsForBrand.length > 2
+        ? domainPartsForBrand[domainPartsForBrand.length - 2]
+        : domainPartsForBrand[0];
+
+    // Find brand mentions that match the user's brand (from Groq extraction)
+    const userBrandMentions = allBrandMentions.filter((bm) => {
+      const bmNameLower = bm.brandName.toLowerCase();
+      const bmDomainParts =
+        bm.brandDomain
+          ?.toLowerCase()
+          .replace(/^www\./, "")
+          .split(".") || [];
+      const bmDomainLower =
+        bmDomainParts.length > 2
+          ? bmDomainParts[bmDomainParts.length - 2]
+          : bmDomainParts[0] || "";
+      return (
+        bmNameLower === userBrandName ||
+        bmNameLower === userDomainBase ||
+        bmDomainLower === userDomainBase
+      );
+    });
+
+    // Create a set of run IDs where the user's brand was mentioned (from Groq)
+    const groqMentionedRunIds = new Set(
+      userBrandMentions.map((bm) => bm.promptRunId)
+    );
+
+    // Helper to check if a run has a mention (from mentionAnalysis OR brandMention)
+    const runHasMention = (runId: string): boolean => {
+      const mentionAnalysisResult = mentionByRunId.get(runId)?.mentioned;
+      const groqResult = groqMentionedRunIds.has(runId);
+      return mentionAnalysisResult || groqResult;
+    };
+
     // Filter to mentions only if requested
     if (mentionsOnly) {
-      runs = runs.filter((r) => {
-        const mention = mentionByRunId.get(r.id);
-        return mention?.mentioned;
-      });
+      runs = runs.filter((r) => runHasMention(r.id));
     }
 
     // Calculate total before pagination
@@ -171,8 +217,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }, 0);
 
     const aggregateStats = {
-      totalMentions: runs.filter((r) => mentionByRunId.get(r.id)?.mentioned)
-        .length,
+      totalMentions: runs.filter((r) => runHasMention(r.id)).length,
       totalCitations,
       totalQueries: runs.length,
       // Group by date for chart - track both mentions and branded citations
@@ -180,7 +225,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         runs.reduce((acc, r) => {
           const date = r.executedAt.toISOString().split("T")[0];
           if (!acc[date]) acc[date] = { mentions: 0, citations: 0 };
-          if (mentionByRunId.get(r.id)?.mentioned) acc[date].mentions++;
+          if (runHasMention(r.id)) acc[date].mentions++;
 
           // Only count citations that reference the user's domain
           const citations = r.citations as
@@ -219,7 +264,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           if (!acc[r.llmProvider])
             acc[r.llmProvider] = { total: 0, mentions: 0 };
           acc[r.llmProvider].total++;
-          if (mentionByRunId.get(r.id)?.mentioned) {
+          if (runHasMention(r.id)) {
             acc[r.llmProvider].mentions++;
           }
           return acc;
@@ -241,8 +286,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const promptData = promptMap.get(run.promptId);
       const domainMention = mentionByRunId.get(run.id);
 
-      // Calculate mention count (how many times mentioned across analyses)
-      const mentionCount = domainMention?.mentioned ? 1 : 0;
+      // Calculate mention count - use both mentionAnalysis AND brandMention data
+      const mentionCount = runHasMention(run.id) ? 1 : 0;
 
       // Get average position from brand mentions
       const mentionedBrands = run.brandMentions.filter((b) => b.mentioned);

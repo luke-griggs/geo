@@ -24,21 +24,27 @@ export function VisibilityChart({ data, currentScore }: VisibilityChartProps) {
 
   // Normalize data to show exactly the last 7 days
   const chartData = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     const days: ChartDataPoint[] = [];
 
-    // Create a map of existing data by date for O(1) lookup
-    // Handle both YYYY-MM-DD strings and ISO strings
-    const dataMap = new Map(
-      data.map((d) => [new Date(d.date).toISOString().split("T")[0], d])
-    );
+    // Helper to format date as YYYY-MM-DD in LOCAL time
+    const toLocalDateStr = (d: Date): string => {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        "0"
+      )}-${String(d.getDate()).padStart(2, "0")}`;
+    };
 
-    // Generate past 7 days
+    // Create a map of existing data by date for O(1) lookup
+    // API returns UTC dates - keep as-is for string matching
+    const dataMap = new Map(data.map((d) => [d.date, d]));
+
+    // Generate past 7 days in LOCAL time (user's perspective of "today")
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr = toLocalDateStr(date); // Local date string
       const existing = dataMap.get(dateStr);
 
       // Determine visibility value
@@ -290,13 +296,7 @@ export function VisibilityChart({ data, currentScore }: VisibilityChartProps) {
             }}
           >
             <div className="text-xs text-gray-500 mb-1">
-              {new Date(chartData[hoveredIndex].date).toLocaleDateString(
-                "en-US",
-                {
-                  month: "short",
-                  day: "numeric",
-                }
-              )}
+              {formatDate(chartData[hoveredIndex].date)}
             </div>
             <div className="font-bold text-indigo-600 text-sm">
               {chartData[hoveredIndex].visibility.toFixed(1)}%
@@ -309,6 +309,9 @@ export function VisibilityChart({ data, currentScore }: VisibilityChartProps) {
 }
 
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
+  // dateStr is YYYY-MM-DD - parse and display nicely
+  // Add time to prevent timezone interpretation issues
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }

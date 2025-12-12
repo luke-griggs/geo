@@ -5,19 +5,20 @@ import { useRouter } from "next/navigation";
 import {
   PanelLeft,
   PanelRight,
-  FileText,
   Settings,
   LogOut,
   ChevronUp,
   ChevronDown,
-  AtSign,
-  Eye,
   Plus,
   Check,
   Search,
-  LayoutDashboard,
-  PenSquare,
+  LayoutGrid,
+  BarChart3,
+  Hash,
+  Pencil,
+  ClipboardList,
 } from "lucide-react";
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -50,13 +51,21 @@ interface Domain {
   name: string | null;
 }
 
-const navItems = [
-  { id: "overview" as const, label: "Overview", icon: LayoutDashboard },
-  { id: "visibility" as const, label: "Visibility", icon: Eye },
-  { id: "mentions" as const, label: "Mentions", icon: AtSign },
-  { id: "prompts" as const, label: "Prompts", icon: FileText },
-  { id: "content" as const, label: "Content", icon: PenSquare },
+// Analytics section items
+const analyticsItems = [
+  { id: "overview" as const, label: "Overview", icon: LayoutGrid },
+  { id: "visibility" as const, label: "Visibility", icon: BarChart3 },
+  { id: "mentions" as const, label: "Mentions", icon: Hash },
 ];
+
+// Action section items
+const actionItems = [
+  { id: "content" as const, label: "Content", icon: Pencil },
+  { id: "prompts" as const, label: "Prompts", icon: ClipboardList },
+];
+
+// All items combined for collapsed view
+const allNavItems = [...analyticsItems, ...actionItems];
 
 function getInitials(name?: string | null) {
   if (!name) return "U";
@@ -112,6 +121,7 @@ interface SidebarProps {
   selectedDomainId?: string;
   onDomainChange?: (domainId: string) => void;
   onDomainAdded?: (domain: Domain) => void;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
 export function Sidebar({
@@ -122,9 +132,15 @@ export function Sidebar({
   selectedDomainId,
   onDomainChange,
   onDomainAdded,
+  onCollapsedChange,
 }: SidebarProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const handleSidebarToggle = (open: boolean) => {
+    setSidebarOpen(open);
+    onCollapsedChange?.(!open);
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addDomainOpen, setAddDomainOpen] = useState(false);
   const [domainSearch, setDomainSearch] = useState("");
@@ -168,7 +184,7 @@ export function Sidebar({
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setSidebarOpen(true)}
+                  onClick={() => handleSidebarToggle(true)}
                   className="p-2 rounded-lg hover:bg-gray-200 transition-colors cursor-default group"
                 >
                   {selectedDomain ? (
@@ -200,7 +216,7 @@ export function Sidebar({
 
           {/* Collapsed navigation */}
           <nav className="flex-1 py-3 px-1.5 space-y-0.5">
-            {navItems.map((item) => {
+            {allNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeSection === item.id;
 
@@ -210,13 +226,24 @@ export function Sidebar({
                     <button
                       onClick={() => onSectionChange(item.id)}
                       className={cn(
-                        "w-full flex items-center justify-center p-2.5 rounded-lg transition-colors cursor-pointer",
+                        "relative w-full flex items-center justify-center p-2.5 rounded-md transition-colors cursor-pointer",
                         isActive
-                          ? "bg-[#ececec] text-gray-900"
-                          : "text-gray-600 hover:bg-[#ececec] hover:text-gray-900"
+                          ? "text-gray-900"
+                          : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                       )}
                     >
-                      <Icon className="h-[18px] w-[18px]" />
+                      {isActive && (
+                        <motion.div
+                          layoutId="collapsed-nav-indicator"
+                          className="absolute inset-0 bg-gray-100 rounded-md"
+                          transition={{
+                            type: "spring",
+                            stiffness: 700,
+                            damping: 40,
+                          }}
+                        />
+                      )}
+                      <Icon className="relative z-10 h-[18px] w-[18px]" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="right" className="text-xs px-2 py-1">
@@ -368,7 +395,7 @@ export function Sidebar({
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setSidebarOpen(false)}
+                  onClick={() => handleSidebarToggle(false)}
                   className="p-1.5 rounded-md hover:bg-gray-200 transition-colors cursor-default group flex-shrink-0"
                 >
                   <PanelLeft className="h-[18px] w-[18px] text-gray-600" />
@@ -381,27 +408,90 @@ export function Sidebar({
           </div>
 
           {/* Expanded navigation */}
-          <nav className="flex-1 py-3 px-2 space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeSection === item.id;
+          <nav className="flex-1 py-3 px-2.5">
+            {/* Analytics Section */}
+            <div className="mb-1">
+              <p className="px-2 py-1.5 text-xs font-medium text-gray-400">
+                Analytics
+              </p>
+              <div className="space-y-0.5">
+                {analyticsItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeSection === item.id;
 
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onSectionChange(item.id)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer",
-                    isActive
-                      ? "bg-[#ececec] text-gray-900"
-                      : "text-gray-600 hover:bg-[#ececec] hover:text-gray-900"
-                  )}
-                >
-                  <Icon className="h-[18px] w-[18px] flex-shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onSectionChange(item.id)}
+                      className={cn(
+                        "relative w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer",
+                        isActive
+                          ? "text-gray-900"
+                          : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                      )}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="expanded-nav-indicator"
+                          className="absolute inset-0 bg-gray-100 rounded-md"
+                          transition={{
+                            type: "spring",
+                            stiffness: 700,
+                            damping: 40,
+                          }}
+                        />
+                      )}
+                      <Icon className="relative z-10 h-[18px] w-[18px] flex-shrink-0" />
+                      <span className="relative z-10 truncate">
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Action Section */}
+            <div className="mt-4">
+              <p className="px-2 py-1.5 text-xs font-medium text-gray-400">
+                Action
+              </p>
+              <div className="space-y-0.5">
+                {actionItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeSection === item.id;
+
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onSectionChange(item.id)}
+                      className={cn(
+                        "relative w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer",
+                        isActive
+                          ? "text-gray-900"
+                          : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                      )}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="expanded-nav-indicator"
+                          className="absolute inset-0 bg-gray-100 rounded-md"
+                          transition={{
+                            type: "spring",
+                            stiffness: 700,
+                            damping: 40,
+                          }}
+                        />
+                      )}
+                      <Icon className="relative z-10 h-[18px] w-[18px] flex-shrink-0" />
+                      <span className="relative z-10 truncate">
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </nav>
 
           {/* Expanded profile */}
