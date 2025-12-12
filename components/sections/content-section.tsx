@@ -273,6 +273,10 @@ export function ContentSection({
     setIsGenerating(true);
     setCurrentStep("draft-view");
 
+    // Track the created project locally for error handling
+    // (React state updates are async, so we can't rely on viewingProject in the catch block)
+    let createdProject: ContentProject | null = null;
+
     try {
       // Create content project
       const createResponse = await fetch(
@@ -294,7 +298,9 @@ export function ContentSection({
       }
 
       const { project } = await createResponse.json();
+      createdProject = project;
       setCurrentProjectId(project.id);
+      setViewingProject(project);
 
       // Generate content
       const generateResponse = await fetch(
@@ -318,8 +324,8 @@ export function ContentSection({
       console.error("Error generating content:", error);
       // Stay on draft view but show error state
       setIsGenerating(false);
-      if (viewingProject) {
-        setViewingProject({ ...viewingProject, status: "failed" });
+      if (createdProject) {
+        setViewingProject({ ...createdProject, status: "failed" });
       }
     }
   };
