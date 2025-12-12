@@ -117,12 +117,6 @@ export function PromptsStep() {
       const allPrompts = topicsWithPrompts.flatMap((topic) =>
         topic.prompts.map((p) => ({
           promptText: p.text,
-          category: p.category as
-            | "brand"
-            | "product"
-            | "comparison"
-            | "recommendation"
-            | "problem_solution",
           topicId: topicNameToId[topic.name],
         }))
       );

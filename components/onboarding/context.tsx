@@ -36,7 +36,6 @@ export interface TopicSuggestion {
 export interface GeneratedPrompt {
   id: string;
   text: string;
-  category: string;
 }
 
 export interface TopicWithPrompts {

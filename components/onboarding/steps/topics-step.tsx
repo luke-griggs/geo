@@ -68,10 +68,9 @@ export function TopicsStep() {
 
             const data = await response.json();
             const prompts: GeneratedPrompt[] = (data.prompts || []).map(
-              (p: { text: string; category: string }, idx: number) => ({
+              (p: { text: string }, idx: number) => ({
                 id: `${topic.name}-${idx}-${Date.now()}`,
                 text: p.text,
-                category: p.category,
               })
             );
 

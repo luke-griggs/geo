@@ -599,20 +599,26 @@ export async function runPromptsInParallel(
   });
 
   // Execute with concurrency limit using a semaphore pattern
-  const executing: Promise<RunResult>[] = [];
+  // Use a Set to avoid the indexOf/splice race condition when promises complete rapidly
+  const executing = new Set<Promise<RunResult>>();
 
   for (const task of queue) {
     const promise = task().then((result) => {
       results.push(result);
-      // Remove from executing array
-      executing.splice(executing.indexOf(promise), 1);
       return result;
     });
 
-    executing.push(promise);
+    executing.add(promise);
+
+    // Clean up the Set when this promise settles (use finally to ensure cleanup)
+    const cleanup = promise.finally(() => {
+      executing.delete(promise);
+    });
+    // Prevent unhandled rejection on the cleanup promise
+    cleanup.catch(() => {});
 
     // When we hit the concurrency limit, wait for one to finish
-    if (executing.length >= concurrency) {
+    if (executing.size >= concurrency) {
       await Promise.race(executing);
     }
   }
