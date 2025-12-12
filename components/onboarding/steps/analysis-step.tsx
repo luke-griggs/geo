@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { AlertTriangle } from "lucide-react";
 import {
   useOnboarding,
   ANALYSIS_MESSAGES,
@@ -85,7 +86,7 @@ export function AnalysisStep() {
         // Loading state
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="relative mb-8">
-            <div className="w-16 h-16 rounded-full border-4 border-gray-200 border-t-gray-900 animate-spin" />
+            <div className="w-16 h-16 rounded-full border-4 border-gray-200 border-t-[#6366f1] animate-spin" />
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
             Analyzing your brand&apos;s AI visibility
@@ -180,6 +181,14 @@ export function AnalysisStep() {
                 to improve {analysisResult.brandName}&apos;s visibility.
               </p>
             </>
+          )}
+
+          {/* Warning banner for partial failures */}
+          {analysisResult.warning && (
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 mb-6">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{analysisResult.warning}</p>
+            </div>
           )}
 
           <button

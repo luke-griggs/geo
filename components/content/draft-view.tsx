@@ -5,6 +5,7 @@ import { ChevronLeft, Copy, Download, Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { motion, AnimatePresence } from "motion/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -314,9 +315,20 @@ export function DraftView({
           {isGenerating ? (
             // Loading state
             <div className="animate-in fade-in duration-300">
-              <h1 className="text-3xl font-semibold text-gray-900 mb-4 transition-opacity duration-500">
-                {LOADING_PHRASES[currentPhraseIndex]}
-              </h1>
+              <div className="h-12 mb-4 relative overflow-hidden">
+                <AnimatePresence mode="wait">
+                  <motion.h1
+                    key={currentPhraseIndex}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.4, ease: "easeInOut" }}
+                    className="text-3xl font-semibold text-gray-900 absolute"
+                  >
+                    {LOADING_PHRASES[currentPhraseIndex]}
+                  </motion.h1>
+                </AnimatePresence>
+              </div>
               <p className="text-base text-gray-500 mb-10">
                 We&apos;re generating your content, this won&apos;t take long.
               </p>

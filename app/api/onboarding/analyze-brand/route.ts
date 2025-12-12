@@ -38,6 +38,7 @@ export interface OnboardingAnalysisResult {
   totalMentions: number;
   totalPrompts: number;
   topics: TopicSuggestion[];
+  warning?: string; // Partial failure warning
 }
 
 /**
@@ -294,7 +295,11 @@ export async function POST(request: NextRequest) {
 
         if (isLLMError(response)) {
           console.error(`[analyze-brand] LLM error: ${response.error}`);
-          return { mentioned: false, brands: [] as ExtractedBrand[] };
+          return {
+            mentioned: false,
+            brands: [] as ExtractedBrand[],
+            error: response.error,
+          };
         }
 
         // Check if our brand was mentioned
@@ -310,9 +315,25 @@ export async function POST(request: NextRequest) {
           ? []
           : brandsResult.brands;
 
-        return { mentioned, brands };
+        return { mentioned, brands, error: null };
       })
     );
+
+    // Check if all prompts failed with LLM errors
+    const failedPrompts = promptResults.filter((r) => r.error !== null);
+    const successfulPrompts = promptResults.filter((r) => r.error === null);
+
+    if (successfulPrompts.length === 0) {
+      // All prompts failed - return an error to the user
+      const firstError = failedPrompts[0]?.error || "Unknown error";
+      console.error(
+        `[analyze-brand] All prompts failed. First error: ${firstError}`
+      );
+      return NextResponse.json(
+        { error: `Failed to analyze brand visibility: ${firstError}` },
+        { status: 500 }
+      );
+    }
 
     // Aggregate results
     const allBrands: ExtractedBrand[] = [];
@@ -365,6 +386,12 @@ export async function POST(request: NextRequest) {
       (brandMentionCount / totalPrompts) * 100
     );
 
+    // Build warning message if some prompts failed
+    const warning =
+      failedPrompts.length > 0
+        ? `${failedPrompts.length} of ${brandAnalysis.prompts.length} AI queries failed. Results may be incomplete.`
+        : undefined;
+
     const result: OnboardingAnalysisResult = {
       brandName: brandAnalysis.brandName,
       domain: cleanDomain,
@@ -375,6 +402,7 @@ export async function POST(request: NextRequest) {
       totalMentions: brandMentionCount,
       totalPrompts,
       topics: brandAnalysis.topics,
+      warning,
     };
 
     console.log(

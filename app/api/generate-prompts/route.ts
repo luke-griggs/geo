@@ -4,12 +4,6 @@ import { headers } from "next/headers";
 
 interface GeneratedPrompt {
   text: string;
-  category:
-    | "brand"
-    | "product"
-    | "comparison"
-    | "recommendation"
-    | "problem_solution";
 }
 
 // POST /api/generate-prompts
@@ -42,27 +36,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemPrompt = `You are an expert at crafting search queries that people would ask AI assistants like ChatGPT, Claude, or Perplexity.
+    const systemPrompt = `You are an expert at crafting search queries that people would ask AI assistants like ChatGPT, Claude, or Perplexity when they're looking for products or services.
 
-Generate ${count} questions that a user might ask about "${topic}" - these should be about the PRODUCT CATEGORY/INDUSTRY, **NOT about any specific brand**. The goal is to see how often brands naturally show up in responses to general industry questions.
+Generate ${count} questions that a user might ask about "${topic}" - these should be about the product category, **NOT about any specific brand**. The goal is to see how often brands naturally show up in responses to questions.
 
 These prompts should:
 - Have natural, HUMAN-LIKE phrasing. occasionally include slight imprecision or casual wording
 - These prompts should have absolutely zero resemblance to ai generated text. No, em-dashes
-- Cover different intents: recommendations, comparisons, how-to questions, best options
 
 for example, if the topic is "electric guitars", the prompts generated would look like:
 
 "what are some good guitars for beginners"
 "give me some recommendations for guitar amps"
-"whats the difference between single coil and humbucker pickups"
+"who sells the besthumbucker pickups"
 "i want to learn guitar, what should i buy first"
 
 IMPORTANT: Return ONLY valid JSON in this exact format, no markdown, reasoning, or explanations:
 
 Think carefully and deeply ponder the fact that I'm asking you to return only JSON in your final response. So while you're thinking, think about your output being JSON only. Do not output anything except for JSON. DO NOT output any paragraphs explaining what you're doing. DO NOT give an overview. RETURN JSON. I want you to ponder this while you're thinking. It is important that your response only includes json in the form below
 
-{"prompts": [{"text": "prompt 1", "category": "recommendation"}, {"text": "prompt 2", "category": "comparison"}, ...]}`;
+{"prompts": [{"text": "prompt 1"}, {"text": "prompt 2"}, ...]}`;
 
     const userPrompt = `Topic: ${topic}
 Industry/Company: ${workspaceName || domain}
@@ -142,13 +135,6 @@ Generate ${count} prompts.`;
       }
 
       // Validate the response
-      const validCategories = [
-        "brand",
-        "product",
-        "comparison",
-        "recommendation",
-        "problem_solution",
-      ];
       const validatedPrompts = prompts
         .filter(
           (p) =>
@@ -159,7 +145,6 @@ Generate ${count} prompts.`;
         .slice(0, count)
         .map((p) => ({
           text: p.text,
-          category: validCategories.includes(p.category) ? p.category : "brand",
         }));
 
       return NextResponse.json({ prompts: validatedPrompts });

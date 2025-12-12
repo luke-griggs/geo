@@ -132,13 +132,13 @@ export function TopicsStep() {
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
           Which topics do you want to create prompts for?
         </h1>
-        <p className="text-gray-500 mb-6">Select up to 10 topics</p>
+        <p className="text-gray-500 mb-6">Select up to 5 topics</p>
 
         {/* Topics list */}
         <div className="flex flex-wrap gap-2 mb-6">
           {[...analysisResult.topics, ...customTopics].map((topic) => {
             const isSelected = selectedTopics.has(topic.name);
-            const canSelect = isSelected || selectedTopics.size < 10;
+            const canSelect = isSelected || selectedTopics.size < 5;
 
             return (
               <button
@@ -185,8 +185,8 @@ export function TopicsStep() {
                 onChange={(e) => setCustomTopicInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && customTopicInput.trim()) {
-                    if (selectedTopics.size >= 10) {
-                      setError("You can only select up to 10 topics");
+                    if (selectedTopics.size >= 5) {
+                      setError("You can only select up to 5 topics");
                       return;
                     }
                     const newTopic = {
@@ -212,8 +212,8 @@ export function TopicsStep() {
               <button
                 onClick={() => {
                   if (customTopicInput.trim()) {
-                    if (selectedTopics.size >= 10) {
-                      setError("You can only select up to 10 topics");
+                    if (selectedTopics.size >= 5) {
+                      setError("You can only select up to 5 topics");
                       return;
                     }
                     const newTopic = {
@@ -246,10 +246,10 @@ export function TopicsStep() {
           ) : (
             <button
               onClick={() => setIsAddingCustomTopic(true)}
-              disabled={selectedTopics.size >= 10}
+              disabled={selectedTopics.size >= 5}
               className={cn(
                 "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-dashed text-sm font-medium transition-all",
-                selectedTopics.size < 10
+                selectedTopics.size < 5
                   ? "border-gray-300 text-gray-600 hover:border-gray-400 hover:text-gray-900"
                   : "border-gray-200 text-gray-400 cursor-not-allowed"
               )}

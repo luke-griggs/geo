@@ -7,6 +7,8 @@ import {
   useCallback,
   useEffect,
   type ReactNode,
+  type Dispatch,
+  type SetStateAction,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -54,6 +56,7 @@ export interface AnalysisResult {
   totalMentions: number;
   totalPrompts: number;
   topics: TopicSuggestion[];
+  warning?: string; // Partial failure warning
 }
 
 export const COMPANY_SIZES = [
@@ -166,7 +169,7 @@ interface OnboardingContextType {
   analysisError: string | null;
   setAnalysisError: (error: string | null) => void;
   analysisMessageIndex: number;
-  setAnalysisMessageIndex: (index: number) => void;
+  setAnalysisMessageIndex: Dispatch<SetStateAction<number>>;
 
   // Topics
   selectedTopics: Set<string>;

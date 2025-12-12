@@ -67,7 +67,8 @@ export async function POST(
 
     // Start parallel prompt runs in the background (fire and forget)
     // We don't await this - it runs in the background
-    runPromptsInParallel(domainId, 5).catch((error) => {
+    // Using concurrency of 15 with semaphore pattern for faster completion
+    runPromptsInParallel(domainId, 15).catch((error) => {
       console.error("Error running prompts in parallel:", error);
     });
 

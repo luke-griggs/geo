@@ -45,10 +45,7 @@ function analyzeResponseForMentions(
   const lowerDomain = domainUrl.toLowerCase().replace(/^www\./, "");
 
   // Build list of variants to check
-  const domainVariants: string[] = [
-    lowerDomain,
-    `www.${lowerDomain}`,
-  ];
+  const domainVariants: string[] = [lowerDomain, `www.${lowerDomain}`];
 
   // Also check for the brand name (e.g., "Fairlife" instead of just "fairlife.com")
   if (brandName) {
@@ -63,10 +60,11 @@ function analyzeResponseForMentions(
   // This extracts the main brand name from domains like "fairlife.com" or "shop.fairlife.com"
   const domainParts = lowerDomain.split(".");
   // Get the main domain name (second-to-last part for subdomains, or first part for simple domains)
-  const domainWithoutTld = domainParts.length > 2 
-    ? domainParts[domainParts.length - 2]  // e.g., "shop.fairlife.com" -> "fairlife"
-    : domainParts[0];  // e.g., "fairlife.com" -> "fairlife"
-  
+  const domainWithoutTld =
+    domainParts.length > 2
+      ? domainParts[domainParts.length - 2] // e.g., "shop.fairlife.com" -> "fairlife"
+      : domainParts[0]; // e.g., "fairlife.com" -> "fairlife"
+
   if (
     domainWithoutTld &&
     domainWithoutTld.length > 2 &&
@@ -76,8 +74,17 @@ function analyzeResponseForMentions(
   }
 
   // Debug logging
-  console.log(`[analyzeResponseForMentions] Domain: ${domainUrl}, Brand: ${brandName || 'NULL'}, Variants: ${domainVariants.join(', ')}`);
-  console.log(`[analyzeResponseForMentions] Response preview: ${responseText.slice(0, 200)}...`);
+  console.log(
+    `[analyzeResponseForMentions] Domain: ${domainUrl}, Brand: ${
+      brandName || "NULL"
+    }, Variants: ${domainVariants.join(", ")}`
+  );
+  console.log(
+    `[analyzeResponseForMentions] Response preview: ${responseText.slice(
+      0,
+      200
+    )}...`
+  );
 
   let mentioned = false;
   let position: number | null = null;
@@ -87,7 +94,9 @@ function analyzeResponseForMentions(
     const index = lowerResponse.indexOf(variant);
     if (index !== -1) {
       mentioned = true;
-      console.log(`[analyzeResponseForMentions] ✓ Found match for variant: "${variant}" at index ${index}`);
+      console.log(
+        `[analyzeResponseForMentions] ✓ Found match for variant: "${variant}" at index ${index}`
+      );
 
       // Calculate rough position (1st, 2nd, etc. in the list)
       // This counts how many sentences/lines come before this mention
@@ -107,7 +116,9 @@ function analyzeResponseForMentions(
   }
 
   if (!mentioned) {
-    console.log(`[analyzeResponseForMentions] ✗ No match found for any variant`);
+    console.log(
+      `[analyzeResponseForMentions] ✗ No match found for any variant`
+    );
   }
 
   return { mentioned, position, contextSnippet };
@@ -416,6 +427,8 @@ export async function runAllPrompts(
 /**
  * Run a single prompt and return result (used by parallel runner)
  * This is a helper that doesn't throw - it returns the result with success/error status
+ *
+ * OPTIMIZED: Citation enrichment and brand extraction are deferred to not block progress
  */
 async function runSinglePromptSafe(
   p: { id: string; promptText: string },
@@ -448,12 +461,11 @@ async function runSinglePromptSafe(
       };
     }
 
-    // Enrich citations with meta descriptions (fetched from URLs)
-    const enrichedCitations = response.citations
-      ? await enrichCitationsWithDescriptions(response.citations)
-      : undefined;
+    // Store citations WITHOUT enrichment - we'll fetch descriptions lazily when viewing
+    // This removes a major bottleneck (5+ HTTP requests per prompt)
+    const citations = response.citations;
 
-    // Store the successful run
+    // Store the successful run immediately (don't wait for enrichment)
     await db.insert(promptRun).values({
       id: promptRunId,
       promptId: p.id,
@@ -461,12 +473,12 @@ async function runSinglePromptSafe(
       responseText: response.text,
       responseMetadata: response.metadata,
       searchQueries: response.searchQueries,
-      citations: enrichedCitations,
+      citations: citations,
       durationMs: response.durationMs,
       executedAt: new Date(),
     });
 
-    // Analyze for mentions
+    // Analyze for mentions (this is fast, keep it synchronous)
     const analysis = analyzeResponseForMentions(
       response.text,
       domainUrl,
@@ -483,8 +495,14 @@ async function runSinglePromptSafe(
       contextSnippet: analysis.contextSnippet,
     });
 
-    // Extract and store brand mentions from the response
-    await storeBrandMentions(response.text, promptRunId);
+    // Defer brand extraction - run in background without blocking
+    // This removes another LLM call from the critical path
+    storeBrandMentions(response.text, promptRunId).catch((err) => {
+      console.error(
+        `Background brand extraction failed for ${promptRunId}:`,
+        err
+      );
+    });
 
     return {
       promptId: p.id,
@@ -509,11 +527,13 @@ async function runSinglePromptSafe(
 
 /**
  * Run prompts in parallel with a specified concurrency limit
- * Updates domain progress as prompts complete
+ * Updates domain progress as EACH prompt completes (not batch-based)
+ *
+ * Uses a concurrent queue pattern for immediate progress updates
  */
 export async function runPromptsInParallel(
   domainId: string,
-  concurrency: number = 5,
+  concurrency: number = 15,
   provider: LLMProvider = "chatgpt"
 ): Promise<RunResult[]> {
   const results: RunResult[] = [];
@@ -533,48 +553,79 @@ export async function runPromptsInParallel(
   });
 
   console.log(
-    `Running ${activePrompts.length} prompts in parallel (concurrency: ${concurrency}) for domain ${domainRecord.domain}, brandName: ${domainRecord.name || 'NULL'}`
+    `Running ${
+      activePrompts.length
+    } prompts with concurrency ${concurrency} for domain ${
+      domainRecord.domain
+    }, brandName: ${domainRecord.name || "NULL"}`
   );
 
   let completedCount = 0;
+  let pendingDbUpdate: Promise<void> | null = null;
 
-  // Process prompts in batches
-  for (let i = 0; i < activePrompts.length; i += concurrency) {
-    const batch = activePrompts.slice(i, i + concurrency);
+  // Helper to update progress (debounced to avoid DB write contention)
+  const updateProgress = async () => {
+    // Skip if there's already a pending update
+    if (pendingDbUpdate) return;
 
-    // Run batch in parallel
-    const batchResults = await Promise.all(
-      batch.map((p) =>
-        runSinglePromptSafe(
-          p,
-          domainRecord.domain,
-          domainId,
-          domainRecord.name,
-          provider
-        )
-      )
+    pendingDbUpdate = db
+      .update(domain)
+      .set({ promptRunProgress: completedCount })
+      .where(eq(domain.id, domainId))
+      .then(() => {
+        pendingDbUpdate = null;
+      });
+  };
+
+  // Concurrent queue pattern - process all prompts with limited concurrency
+  // Each prompt updates progress immediately when it completes
+  const queue = activePrompts.map((p) => async () => {
+    const result = await runSinglePromptSafe(
+      p,
+      domainRecord.domain,
+      domainId,
+      domainRecord.name,
+      provider
     );
 
-    results.push(...batchResults);
-    completedCount += batchResults.length;
-
-    // Update domain progress
-    await db
-      .update(domain)
-      .set({
-        promptRunProgress: completedCount,
-      })
-      .where(eq(domain.id, domainId));
-
+    // Update progress immediately when this prompt completes
+    completedCount++;
     console.log(`Progress: ${completedCount}/${activePrompts.length}`);
 
-    // Small delay between batches to avoid rate limiting
-    if (i + concurrency < activePrompts.length) {
-      await new Promise((resolve) => setTimeout(resolve, 200));
+    // Fire off progress update (don't await to avoid blocking)
+    updateProgress();
+
+    return result;
+  });
+
+  // Execute with concurrency limit using a semaphore pattern
+  const executing: Promise<RunResult>[] = [];
+
+  for (const task of queue) {
+    const promise = task().then((result) => {
+      results.push(result);
+      // Remove from executing array
+      executing.splice(executing.indexOf(promise), 1);
+      return result;
+    });
+
+    executing.push(promise);
+
+    // When we hit the concurrency limit, wait for one to finish
+    if (executing.length >= concurrency) {
+      await Promise.race(executing);
     }
   }
 
-  // Mark domain as completed
+  // Wait for remaining tasks to complete
+  await Promise.all(executing);
+
+  // Wait for any pending DB update to complete
+  if (pendingDbUpdate) {
+    await pendingDbUpdate;
+  }
+
+  // Mark domain as completed with final count
   await db
     .update(domain)
     .set({

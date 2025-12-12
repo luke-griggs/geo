@@ -50,7 +50,7 @@ Make each item valuable and actionable.`,
       .map((url, i) => `${i + 1}. ${url}`)
       .join("\n");
 
-    return `You are an expert SEO content writer. Write a high-quality, comprehensive article that will rank well in search engines.
+    return `You are an expert SEO content writer. Write a solid article that will rank well in search engines.
 
 ARTICLE TITLE: "${title}"
 TARGET KEYWORD: "${keyword}"
@@ -58,21 +58,19 @@ TARGET KEYWORD: "${keyword}"
 FORMAT INSTRUCTIONS:
 ${formatInstruction}
 
-REFERENCE SOURCES (use these as inspiration and research, but write original content):
+REFERENCE SOURCES (use these as inspiration, but write original content):
 ${citationList}
 
-IMPORTANT GUIDELINES:
-- Write original content inspired by the reference sources - do NOT copy text directly
-- Focus on providing genuine value to readers
-- Use proper markdown formatting (headings, lists, bold, etc.)
-- Include the target keyword naturally throughout the article
-- Keep the content under 1200 words
-- Write in a clear, engaging style
+A few notes:
+- Don't overthink this - just skim the references to get the gist and then start writing. You don't need to deeply analyze every source.
+- Aim for around 800-1200 words - enough to be helpful but don't pad it out.
+- Use markdown formatting (headings, lists, bold) where it makes sense.
+- Include the target keyword naturally - don't force it.
 
-Write the complete article in markdown format now.`;
+Go ahead and write the article in markdown.`;
   } else {
     // When no citations, use web search to research the topic
-    return `You are an expert SEO content writer. Research the topic using web search to find the most current and relevant information, then write a high-quality article that will rank well in search engines.
+    return `You are an expert SEO content writer. Write a solid article on this topic.
 
 ARTICLE TITLE: "${title}"
 TARGET KEYWORD: "${keyword}"
@@ -80,15 +78,14 @@ TARGET KEYWORD: "${keyword}"
 FORMAT INSTRUCTIONS:
 ${formatInstruction}
 
-IMPORTANT GUIDELINES:
-- Analyze the top-ranking content to understand what makes articles rank well for this topic
-- Write original, well-researched content based on your findings
-- Use proper markdown formatting (headings, lists, bold, etc.)
-- Include the target keyword naturally throughout the article
-- Keep the content under 1200 words
-- Write in a clear, engaging style
-- Don't make up any information
-`;
+A few notes:
+- If you need to look something up, a quick search is fine - but don't go overboard with research. Get a good sense of the topic and start writing.
+- Aim for around 800-1200 words - enough to be helpful but don't pad it out.
+- Use markdown formatting (headings, lists, bold) where it makes sense.
+- Include the target keyword naturally - don't force it.
+- Just make sure the facts are accurate.
+
+Go ahead and write the article in markdown.`;
   }
 }
 
@@ -125,9 +122,12 @@ async function generateArticleWithGPT(
       input: prompt,
       model: "gpt-5.1",
       tools: [{ type: "web_search" }],
-      // When we have citations, web search is optional (model can use it if needed)
-      // When no citations, web search is required to research the topic
-      tool_choice: hasCitations ? "auto" : "required",
+      reasoning: {
+        effort: "none",
+      },
+      // Cap output to ~1200 words (roughly 2500 tokens with markdown)
+      // Use auto for tool choice - required forces extensive searches which is slow
+      tool_choice: "auto",
     }),
   });
 

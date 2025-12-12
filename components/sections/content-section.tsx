@@ -730,7 +730,7 @@ export function ContentSection({
             </h3>
             <p className="text-sm text-gray-500">
               We&apos;re analyzing top-ranking pages and writing your article.
-              This may take a minute...
+              This won&apos;t take long...
             </p>
           </div>
         </div>
