@@ -23,6 +23,7 @@ import { ContentConfigModal } from "@/components/content/content-config-modal";
 import { TemplateSelectionModal } from "@/components/content/template-selection-modal";
 import { ContentProjectView } from "@/components/content/content-project-view";
 import { TopicContentConfig } from "@/components/content/topic-content-config";
+import { DraftView } from "@/components/content/draft-view";
 
 interface SerpResult {
   url: string;
@@ -58,7 +59,8 @@ type ModalStep =
   | "generating"
   | "view"
   | "topics-template"
-  | "topics-config";
+  | "topics-config"
+  | "draft-view";
 
 function StatusBadge({ status }: { status: ContentProject["status"] }) {
   const statusStyles = {
@@ -137,6 +139,7 @@ export function ContentSection({
   const [topicsTemplate, setTopicsTemplate] = useState<
     "smart_suggestion" | "blog_post" | "listicle"
   >("smart_suggestion");
+  const [draftTitle, setDraftTitle] = useState<string>("");
 
   // Fetch projects on mount
   useEffect(() => {
@@ -233,7 +236,8 @@ export function ContentSection({
 
   const handleViewProject = (project: ContentProject) => {
     setViewingProject(project);
-    setCurrentStep("view");
+    setDraftTitle(project.title || "Untitled");
+    setCurrentStep("draft-view");
   };
 
   const handleDeleteProject = async (projectId: string) => {
@@ -264,7 +268,10 @@ export function ContentSection({
     title: string;
     template: string;
   }) => {
+    // Immediately transition to draft view with loading state
+    setDraftTitle(config.title);
     setIsGenerating(true);
+    setCurrentStep("draft-view");
 
     try {
       // Create content project
@@ -287,6 +294,7 @@ export function ContentSection({
       }
 
       const { project } = await createResponse.json();
+      setCurrentProjectId(project.id);
 
       // Generate content
       const generateResponse = await fetch(
@@ -300,18 +308,19 @@ export function ContentSection({
 
       const { project: updatedProject } = await generateResponse.json();
 
-      // Show the result
+      // Update with the completed project
       setViewingProject(updatedProject);
-      setCurrentStep("view");
+      setIsGenerating(false);
 
       // Refresh project list
       fetchProjects();
     } catch (error) {
       console.error("Error generating content:", error);
-      alert("Failed to generate content. Please try again.");
-      setCurrentStep(null);
-    } finally {
+      // Stay on draft view but show error state
       setIsGenerating(false);
+      if (viewingProject) {
+        setViewingProject({ ...viewingProject, status: "failed" });
+      }
     }
   };
 
@@ -321,9 +330,30 @@ export function ContentSection({
     setConfigData(null);
     setCurrentProjectId(null);
     setViewingProject(null);
+    setDraftTitle("");
+    setIsGenerating(false);
   };
 
   const totalItems = projects.length;
+
+  // If we're in draft-view mode, show the full-page draft view
+  if (currentStep === "draft-view") {
+    return (
+      <DraftView
+        project={viewingProject}
+        isGenerating={isGenerating}
+        title={draftTitle}
+        onBack={() => {
+          setCurrentStep(null);
+          setViewingProject(null);
+          setDraftTitle("");
+          setIsGenerating(false);
+        }}
+        organizationId={organizationId}
+        domainId={domainId}
+      />
+    );
+  }
 
   // If we're in topics-config mode, show the inline configuration view
   if (currentStep === "topics-config") {
@@ -360,8 +390,7 @@ export function ContentSection({
                   Generating your content
                 </h3>
                 <p className="text-sm text-gray-500">
-                  We're analyzing top-cited pages and writing your article. This
-                  may take a minute...
+                  We&apos;re analyzing top-cited pages and writing your article.
                 </p>
               </div>
             ) : (
@@ -425,7 +454,7 @@ export function ContentSection({
               </span>
               <div className="flex items-start gap-5">
                 {/* Icon placeholder */}
-                <div className="w-24 h-28 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-2.5 flex-shrink-0">
+                <div className="w-28 h-36 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-2.5 flex-shrink-0">
                   <MessageSquare className="w-6 h-6 text-gray-400" />
                   <div className="space-y-1.5">
                     <div className="w-12 h-1.5 bg-gray-300 rounded" />
@@ -459,7 +488,7 @@ export function ContentSection({
             >
               <div className="flex items-start gap-5">
                 {/* Icon placeholder */}
-                <div className="w-24 h-28 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-2.5 flex-shrink-0">
+                <div className="w-28 h-36 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-2.5 flex-shrink-0">
                   <Sparkles className="w-6 h-6 text-gray-400" />
                   <div className="space-y-1.5">
                     <div className="w-12 h-1.5 bg-gray-300 rounded" />
@@ -694,8 +723,8 @@ export function ContentSection({
               Generating your content
             </h3>
             <p className="text-sm text-gray-500">
-              We're analyzing top-ranking pages and writing your article. This
-              may take a minute...
+              We&apos;re analyzing top-ranking pages and writing your article.
+              This may take a minute...
             </p>
           </div>
         </div>

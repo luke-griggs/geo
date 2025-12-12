@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 :root {
   --background: #ffffff;
@@ -126,6 +127,39 @@ body {
 
 .slide-in-from-right-4 {
   animation-name: slideFromRight4;
+}
+
+.slide-in-from-bottom-4 {
+  animation-name: slideFromBottom4;
+}
+
+@keyframes slideFromBottom4 {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Shimmer animation for loading text */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+.fade-in {
+  animation-name: fadeIn;
 }
 
 /* Animation delay utilities */

@@ -949,7 +949,7 @@ export function TopicContentConfig({
               )}
             >
               <Sparkles className="w-4 h-4" />
-              Generate Content Brief
+              Generate Draft
             </button>
           </div>
         )}
@@ -961,7 +961,7 @@ export function TopicContentConfig({
             className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg bg-gray-100 text-gray-400 cursor-not-allowed"
           >
             <Sparkles className="w-4 h-4" />
-            Generate Content Brief
+            Generate Draft
           </button>
         )}
       </div>

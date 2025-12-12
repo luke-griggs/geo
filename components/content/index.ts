@@ -3,3 +3,4 @@ export { ContentConfigModal } from "./content-config-modal";
 export { TemplateSelectionModal } from "./template-selection-modal";
 export { ContentProjectView } from "./content-project-view";
 export { TopicContentConfig } from "./topic-content-config";
+export { DraftView } from "./draft-view";

@@ -13,103 +13,15 @@ interface RouteParams {
   }>;
 }
 
-interface SerpResult {
-  url: string;
-  title: string;
-  snippet: string;
-  position: number;
-}
-
-interface FirecrawlResponse {
-  success: boolean;
-  data?: {
-    markdown?: string;
-    content?: string;
-  };
-  error?: string;
-}
-
-interface ScrapedPage {
-  url: string;
-  title: string;
-  content: string;
-}
-
 /**
- * Scrape a single URL using Firecrawl
+ * Build the prompt for GPT 5.1 based on template type and available context
  */
-async function scrapeWithFirecrawl(url: string): Promise<ScrapedPage | null> {
-  const apiKey = process.env.FIRECRAWL_API_KEY;
-  if (!apiKey) {
-    console.error("FIRECRAWL_API_KEY not configured");
-    return null;
-  }
-
-  try {
-    const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        url,
-        formats: ["markdown"],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Firecrawl error for ${url}:`, errorText);
-      return null;
-    }
-
-    const data: FirecrawlResponse = await response.json();
-
-    if (!data.success || !data.data?.markdown) {
-      console.error(`Firecrawl failed for ${url}:`, data.error);
-      return null;
-    }
-
-    // Extract title from markdown (first h1) or use URL
-    const titleMatch = data.data.markdown.match(/^#\s+(.+)$/m);
-    const title = titleMatch ? titleMatch[1] : url;
-
-    return {
-      url,
-      title,
-      content: data.data.markdown,
-    };
-  } catch (error) {
-    console.error(`Error scraping ${url}:`, error);
-    return null;
-  }
-}
-
-/**
- * Generate article content using Groq
- */
-async function generateArticle(
+function buildPrompt(
   keyword: string,
   title: string,
   template: string,
-  scrapedPages: ScrapedPage[]
-): Promise<string> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    throw new Error("GROQ_API_KEY not configured");
-  }
-
-  // Build context from scraped pages
-  const contextParts = scrapedPages.map((page, index) => {
-    // Truncate content to avoid token limits
-    const truncatedContent = page.content.slice(0, 3000);
-    return `--- SOURCE ${index + 1}: ${page.title} (${
-      page.url
-    }) ---\n${truncatedContent}\n`;
-  });
-  const context = contextParts.join("\n\n");
-
+  citations: string[]
+): string {
   // Template-specific instructions
   const templateInstructions: Record<string, string> = {
     blog_post: `Write a comprehensive, engaging blog post. Structure it with:
@@ -124,73 +36,137 @@ The tone should be professional yet conversational.`,
 - Each item should have a descriptive heading and 2-3 paragraphs of detail
 - A brief conclusion
 Make each item valuable and actionable.`,
-    smart_suggestion: `Analyze the top-ranking content and write an article that:
-- Covers the most important points from the sources
-- Uses the best structure based on what's ranking well
-- Provides unique value and insights
-- Is comprehensive yet easy to read
-Decide the best format (listicle, guide, how-to, etc.) based on the content.`,
+    smart_suggestion: `Analyze the topic and determine the best article format (listicle, guide, how-to, comparison, etc.) based on what would be most helpful for readers searching for this topic. Then write the article using that optimal format.`,
   };
 
-  const systemPrompt = `You are an expert SEO content writer. Your task is to write high-quality, original content that can rank well in search engines.
+  const formatInstruction =
+    templateInstructions[template] || templateInstructions.smart_suggestion;
+
+  const hasCitations = citations.length > 0;
+
+  if (hasCitations) {
+    // When we have citations, include them as reference sources
+    const citationList = citations
+      .map((url, i) => `${i + 1}. ${url}`)
+      .join("\n");
+
+    return `You are an expert SEO content writer. Write a high-quality, comprehensive article that will rank well in search engines.
+
+ARTICLE TITLE: "${title}"
+TARGET KEYWORD: "${keyword}"
+
+FORMAT INSTRUCTIONS:
+${formatInstruction}
+
+REFERENCE SOURCES (use these as inspiration and research, but write original content):
+${citationList}
 
 IMPORTANT GUIDELINES:
-- Write original content inspired by the sources, do NOT copy text directly
+- Write original content inspired by the reference sources - do NOT copy text directly
 - Focus on providing genuine value to readers
 - Use proper markdown formatting (headings, lists, bold, etc.)
-- Include relevant keywords naturally (target keyword: "${keyword}")
-- Make the content comprehensive and thorough
+- Include the target keyword naturally throughout the article
+- Keep the content under 1200 words
 - Write in a clear, engaging style
 
-${templateInstructions[template] || templateInstructions.smart_suggestion}`;
+Write the complete article in markdown format now.`;
+  } else {
+    // When no citations, use web search to research the topic
+    return `You are an expert SEO content writer. Research the topic using web search to find the most current and relevant information, then write a high-quality article that will rank well in search engines.
 
-  const userPrompt = `Write an article with the title: "${title}"
+ARTICLE TITLE: "${title}"
+TARGET KEYWORD: "${keyword}"
 
-Target keyword: ${keyword}
+FORMAT INSTRUCTIONS:
+${formatInstruction}
 
-Use the following top-ranking content as research and inspiration:
+IMPORTANT GUIDELINES:
+- Analyze the top-ranking content to understand what makes articles rank well for this topic
+- Write original, well-researched content based on your findings
+- Use proper markdown formatting (headings, lists, bold, etc.)
+- Include the target keyword naturally throughout the article
+- Keep the content under 1200 words
+- Write in a clear, engaging style
+- Don't make up any information
+`;
+  }
+}
 
-${context}
+/**
+ * Generate article content using GPT 5.1 with web search
+ */
+async function generateArticleWithGPT(
+  keyword: string,
+  title: string,
+  template: string,
+  citations: string[]
+): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY not configured");
+  }
 
-Write the complete article in markdown format.`;
+  const prompt = buildPrompt(keyword, title, template, citations);
+  const hasCitations = citations.length > 0;
 
-  const response = await fetch(
-    "https://api.groq.com/openai/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "meta-llama/llama-4-maverick-17b-128e-instruct",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 4096,
-      }),
-    }
+  console.log(
+    `Generating article with GPT 5.1 (web_search: ${
+      hasCitations ? "auto" : "required"
+    })...`
   );
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      input: prompt,
+      model: "gpt-5.1",
+      tools: [{ type: "web_search" }],
+      // When we have citations, web search is optional (model can use it if needed)
+      // When no citations, web search is required to research the topic
+      tool_choice: hasCitations ? "auto" : "required",
+    }),
+  });
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Groq API error: ${error}`);
+    throw new Error(`OpenAI API error: ${error}`);
   }
 
   const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
 
-  if (!content) {
+  // Extract text from the nested response structure
+  let text = "";
+
+  if (data.output && Array.isArray(data.output)) {
+    for (const item of data.output) {
+      // Extract text from message items
+      if (
+        item.type === "message" &&
+        item.content &&
+        Array.isArray(item.content)
+      ) {
+        for (const contentItem of item.content) {
+          if (contentItem.type === "output_text" && contentItem.text) {
+            text += contentItem.text;
+          }
+        }
+      }
+    }
+  }
+
+  if (!text) {
     throw new Error("No content generated");
   }
 
-  return content;
+  return text;
 }
 
 // POST /api/organizations/:organizationId/domains/:domainId/content/:projectId/generate
-// Scrapes selected pages with Firecrawl and generates article with LLM
+// Generates article with GPT 5.1 using web search for research
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await auth.api.getSession({
@@ -266,48 +242,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .where(eq(contentProject.id, projectId));
 
     try {
-      // Get URLs to scrape
-      const serpResults = project.serpResults as SerpResult[] | null;
+      // Get citations from selected pages
       const selectedPages = project.selectedPages as string[] | null;
-
-      let urlsToScrape: string[] = [];
-      if (selectedPages && selectedPages.length > 0) {
-        urlsToScrape = selectedPages;
-      } else if (serpResults && serpResults.length > 0) {
-        // Default to top 5 results
-        urlsToScrape = serpResults.slice(0, 5).map((r) => r.url);
-      }
-
-      if (urlsToScrape.length === 0) {
-        throw new Error("No pages to scrape for context");
-      }
-
-      // Scrape pages in parallel
-      console.log(`Scraping ${urlsToScrape.length} pages...`);
-      const scrapeResults = await Promise.all(
-        urlsToScrape.map((url) => scrapeWithFirecrawl(url))
-      );
-
-      // Filter out failed scrapes
-      const scrapedPages = scrapeResults.filter(
-        (result): result is ScrapedPage => result !== null
-      );
-
-      if (scrapedPages.length === 0) {
-        throw new Error("Failed to scrape any pages");
-      }
+      const citations = selectedPages || [];
 
       console.log(
-        `Successfully scraped ${scrapedPages.length}/${urlsToScrape.length} pages`
+        `Generating article with ${citations.length} citations for: "${project.title}"`
       );
 
-      // Generate the article
-      console.log(`Generating article with template: ${project.template}...`);
-      const generatedContent = await generateArticle(
+      // Generate the article with GPT 5.1
+      const generatedContent = await generateArticleWithGPT(
         project.keyword,
         project.title,
         project.template,
-        scrapedPages
+        citations
       );
 
       // Update project with generated content
@@ -344,4 +292,3 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 }
-

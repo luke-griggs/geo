@@ -6,7 +6,6 @@ import {
   Loader2,
   FileText,
   Zap,
-  Lightbulb,
   MessageSquare,
   ChevronRight,
   Info,
@@ -347,22 +346,18 @@ export function OverviewSection({
       icon: FileText,
       label: "Create Content",
       description: "Generate optimized content",
-    },
-    {
-      icon: Zap,
-      label: "Optimize Content",
-      description: "Improve existing pages",
-    },
-    {
-      icon: Lightbulb,
-      label: "View Opportunities",
-      description: "Find ranking gaps",
+      onClick: () => onNavigate?.("content"),
     },
     {
       icon: MessageSquare,
       label: "Manage Prompts",
       description: `${data?.totalPrompts || 0}/100 used`,
       onClick: () => onNavigate?.("prompts"),
+    },
+    {
+      icon: Zap,
+      label: "Optimize Content",
+      description: "Improve existing pages",
     },
   ];
 
@@ -476,7 +471,7 @@ export function OverviewSection({
                   <button
                     key={index}
                     onClick={card.onClick}
-                    className="w-full flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-100 cursor-pointer transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-gray-100 rounded-lg">
