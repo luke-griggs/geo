@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
   Search,
@@ -19,6 +20,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { QUERY_STALE_TIMES } from "@/components/providers";
 
 interface BrandMention {
   id: string;
@@ -63,6 +65,21 @@ interface PromptsSectionProps {
   organizationId: string;
   domainId: string;
   domainName: string;
+}
+
+// Fetch function for prompts
+async function fetchPrompts(
+  organizationId: string,
+  domainId: string,
+  archived: boolean
+): Promise<{ prompts: Prompt[] }> {
+  const res = await fetch(
+    `/api/organizations/${organizationId}/domains/${domainId}/prompts?archived=${archived}`
+  );
+  if (!res.ok) {
+    throw new Error("Failed to fetch prompts");
+  }
+  return res.json();
 }
 
 function StatusDot({ status }: { status: "active" | "warning" | "inactive" }) {
@@ -426,11 +443,7 @@ export function PromptsSection({
   domainName,
 }: PromptsSectionProps) {
   const router = useRouter();
-  // Cache both active and archived prompts for instant switching
-  const [activePrompts, setActivePrompts] = useState<Prompt[]>([]);
-  const [archivedPrompts, setArchivedPrompts] = useState<Prompt[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [runningPromptIds, setRunningPromptIds] = useState<Set<string>>(
@@ -446,8 +459,46 @@ export function PromptsSection({
   const [isArchiving, setIsArchiving] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  // Fetch active prompts with React Query
+  const {
+    data: activeData,
+    isLoading: isLoadingActive,
+    error: activeError,
+    refetch: refetchActive,
+  } = useQuery({
+    queryKey: ["prompts", organizationId, domainId, "active"],
+    queryFn: () => fetchPrompts(organizationId, domainId, false),
+    staleTime: QUERY_STALE_TIMES.dynamic,
+    placeholderData: (previousData) => previousData,
+  });
+
+  // Fetch archived prompts with React Query
+  const {
+    data: archivedData,
+    isLoading: isLoadingArchived,
+    error: archivedError,
+    refetch: refetchArchived,
+  } = useQuery({
+    queryKey: ["prompts", organizationId, domainId, "archived"],
+    queryFn: () => fetchPrompts(organizationId, domainId, true),
+    staleTime: QUERY_STALE_TIMES.dynamic,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const activePrompts = activeData?.prompts || [];
+  const archivedPrompts = archivedData?.prompts || [];
+  const isLoading = isLoadingActive || isLoadingArchived;
+  const error = activeError || archivedError;
+
   // Get current prompts based on view mode
   const prompts = viewMode === "active" ? activePrompts : archivedPrompts;
+
+  // Helper to invalidate prompts cache
+  const invalidatePrompts = () => {
+    queryClient.invalidateQueries({
+      queryKey: ["prompts", organizationId, domainId],
+    });
+  };
 
   // Selection handler for individual prompts
   const togglePromptSelection = (promptId: string) => {
@@ -461,40 +512,6 @@ export function PromptsSection({
       return next;
     });
   };
-
-  // Fetch both active and archived prompts in parallel for instant switching
-  const fetchAllPrompts = useCallback(async () => {
-    try {
-      const [activeRes, archivedRes] = await Promise.all([
-        fetch(
-          `/api/organizations/${organizationId}/domains/${domainId}/prompts?archived=false`
-        ),
-        fetch(
-          `/api/organizations/${organizationId}/domains/${domainId}/prompts?archived=true`
-        ),
-      ]);
-
-      if (!activeRes.ok || !archivedRes.ok) {
-        throw new Error("Failed to fetch prompts");
-      }
-
-      const [activeData, archivedData] = await Promise.all([
-        activeRes.json(),
-        archivedRes.json(),
-      ]);
-
-      setActivePrompts(activeData.prompts || []);
-      setArchivedPrompts(archivedData.prompts || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load prompts");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [organizationId, domainId]);
-
-  useEffect(() => {
-    fetchAllPrompts();
-  }, [fetchAllPrompts]);
 
   // Create a new prompt
   const handleCreatePrompt = async (promptText: string) => {
@@ -516,8 +533,8 @@ export function PromptsSection({
         throw new Error(data.error || "Failed to create prompt");
       }
 
-      // Refresh prompts list
-      await fetchAllPrompts();
+      // Invalidate prompts cache to refresh
+      invalidatePrompts();
       setIsModalOpen(false);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to create prompt");
@@ -544,8 +561,8 @@ export function PromptsSection({
         throw new Error(data.error || "Failed to run prompt");
       }
 
-      // Refresh prompts to show new run
-      await fetchAllPrompts();
+      // Invalidate prompts cache to show new run
+      invalidatePrompts();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to run prompt");
     } finally {
@@ -577,8 +594,8 @@ export function PromptsSection({
         );
       }
 
-      // Refresh prompts list
-      await fetchAllPrompts();
+      // Invalidate prompts cache to refresh
+      invalidatePrompts();
       // Clear selection
       setSelectedPromptIds(new Set());
       // Close panel if open
@@ -614,8 +631,8 @@ export function PromptsSection({
 
       await Promise.all(promises);
 
-      // Refresh prompts list
-      await fetchAllPrompts();
+      // Invalidate prompts cache to refresh
+      invalidatePrompts();
       // Clear selection
       setSelectedPromptIds(new Set());
     } catch (err) {
@@ -690,12 +707,13 @@ export function PromptsSection({
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <p className="text-red-600 mb-2">{error}</p>
+          <p className="text-red-600 mb-2">
+            {error instanceof Error ? error.message : "Failed to load prompts"}
+          </p>
           <button
             onClick={() => {
-              setError(null);
-              setIsLoading(true);
-              fetchAllPrompts();
+              refetchActive();
+              refetchArchived();
             }}
             className="text-sm text-gray-600 hover:text-gray-900 underline"
           >

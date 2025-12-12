@@ -12,12 +12,14 @@ import {
   BarChart3,
   TrendingUp,
 } from "lucide-react";
+import { motion } from "motion/react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { NavSection } from "@/components/sidebar";
 import { useState } from "react";
 
@@ -345,10 +347,51 @@ export function OverviewSection({
   // Show initial loading while checking status
   if (isStatusLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-          <p className="text-sm text-gray-500">Loading...</p>
+      <div className="flex flex-col pb-12">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Overview</h1>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Visibility Score skeleton */}
+          <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-8 w-16 rounded-lg" />
+            </div>
+            <Skeleton className="h-10 w-20 mb-6" />
+            <div className="flex items-end justify-around h-48 gap-8">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-2">
+                  <Skeleton className="h-3 w-10 mb-1" />
+                  <Skeleton
+                    className="w-16 rounded-t-lg"
+                    style={{ height: `${30 + Math.random() * 70}%` }}
+                  />
+                  <Skeleton className="w-5 h-5 rounded-full" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Improve Visibility skeleton */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <Skeleton className="h-4 w-32 mb-4" />
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-3 rounded-lg border border-gray-100"
+                >
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="w-8 h-8 rounded-lg" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                  <Skeleton className="h-4 w-4" />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -375,10 +418,76 @@ export function OverviewSection({
 
   if (isDataLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-          <p className="text-sm text-gray-500">Loading overview...</p>
+      <div className="flex flex-col pb-12">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Overview</h1>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Visibility Score skeleton */}
+          <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-8 w-16 rounded-lg" />
+            </div>
+            <Skeleton className="h-10 w-20 mb-6" />
+            <div className="flex items-end justify-around h-48 gap-8">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-2">
+                  <Skeleton className="h-3 w-10 mb-1" />
+                  <Skeleton
+                    className="w-16 rounded-t-lg"
+                    style={{ height: `${30 + Math.random() * 70}%` }}
+                  />
+                  <Skeleton className="w-5 h-5 rounded-full" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Improve Visibility skeleton */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <Skeleton className="h-4 w-32 mb-4" />
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-3 rounded-lg border border-gray-100"
+                >
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="w-8 h-8 rounded-lg" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                  <Skeleton className="h-4 w-4" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Topic Performance skeleton */}
+        <div className="mt-6">
+          <div className="mb-4">
+            <Skeleton className="h-6 w-56 mb-2" />
+            <Skeleton className="h-4 w-72" />
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-6 py-4 border-b border-gray-100"
+                >
+                  <div className="flex-1">
+                    <Skeleton className="h-4 w-32 mb-2" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-5 w-16" />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -436,7 +545,12 @@ export function OverviewSection({
           <h1 className="text-2xl font-bold text-gray-900">Overview</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        >
           {/* Visibility Score Card */}
           <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
@@ -561,10 +675,15 @@ export function OverviewSection({
               })}
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Topic Performance Breakdown */}
-        <div className="mt-6">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
+          className="mt-6"
+        >
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-gray-900">
               Topic Performance Breakdown
@@ -577,13 +696,13 @@ export function OverviewSection({
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             {(data?.topicPerformance || []).length > 0 ? (
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Topic
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <div className="flex items-center gap-1">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <div className="flex items-center justify-center gap-1">
                         Visibility
                         <Tooltip>
                           <TooltipTrigger>
@@ -597,8 +716,8 @@ export function OverviewSection({
                         </Tooltip>
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <div className="flex items-center gap-1">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <div className="flex items-center justify-center gap-1">
                         Citation Share
                         <Tooltip>
                           <TooltipTrigger>
@@ -628,24 +747,22 @@ export function OverviewSection({
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600">
-                            {topic.visibilityRank
-                              ? `#${topic.visibilityRank}`
-                              : "#0"}
-                          </span>
-                          <span className="text-sm font-medium">
+                        <div className="flex items-center justify-center gap-3">
+                          <span className="text-sm font-medium text-gray-900">
                             {topic.visibilityScore.toFixed(0)}%
                           </span>
-                          <span className="text-gray-400">–</span>
+                          {topic.visibilityRank && (
+                            <span className="text-xs font-medium text-[#6366f1] bg-indigo-50 px-2 py-0.5 rounded-full">
+                              #{topic.visibilityRank}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
+                        <div className="flex items-center justify-center">
+                          <span className="text-sm font-medium text-gray-900">
                             {topic.citationShare.toFixed(1)}%
                           </span>
-                          <span className="text-gray-400">–</span>
                         </div>
                       </td>
                     </tr>
@@ -661,7 +778,7 @@ export function OverviewSection({
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
       </div>
     </TooltipProvider>
   );

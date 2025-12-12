@@ -7,6 +7,7 @@ import { runSinglePrompt } from "@/lib/prompt-runner";
 import type { LLMProvider } from "@/lib/llm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { CACHE_HEADERS } from "@/lib/cache";
 
 type Params = Promise<{ organizationId: string; domainId: string }>;
 
@@ -109,7 +110,14 @@ export async function GET(
       orderBy: (prompt, { desc }) => [desc(prompt.createdAt)],
     });
 
-    return NextResponse.json({ prompts });
+    return NextResponse.json(
+      { prompts },
+      {
+        headers: {
+          "Cache-Control": CACHE_HEADERS.dynamic,
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching prompts:", error);
     return NextResponse.json(

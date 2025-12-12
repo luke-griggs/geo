@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Info, Loader2 } from "lucide-react";
+import { motion } from "motion/react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
+import { QUERY_STALE_TIMES } from "@/components/providers";
 
 interface SourceDomainsProps {
   organizationId: string;
@@ -42,16 +46,37 @@ const CHART_COLORS = [
   "#06b6d4", // cyan
 ];
 
+// Fetch function
+async function fetchSourceDomains(
+  organizationId: string,
+  domainId: string,
+  startDate: string,
+  endDate: string,
+  platforms: string[]
+): Promise<SourceDomainsData> {
+  const params = new URLSearchParams({ startDate, endDate });
+
+  if (platforms.length > 0) {
+    params.set("platforms", platforms.join(","));
+  }
+
+  const res = await fetch(
+    `/api/organizations/${organizationId}/domains/${domainId}/source-domains?${params}`
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch source domains");
+  }
+
+  return res.json();
+}
+
 export function SourceDomainsSection({
   organizationId,
   domainId,
   timePeriod,
   platforms,
 }: SourceDomainsProps) {
-  const [data, setData] = useState<SourceDomainsData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Calculate date range from time period
   const dateRange = useMemo(() => {
     const endDate = new Date();
@@ -77,40 +102,27 @@ export function SourceDomainsSection({
     };
   }, [timePeriod]);
 
-  const fetchSourceDomains = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-      });
-
-      if (platforms.length > 0) {
-        params.set("platforms", platforms.join(","));
-      }
-
-      const res = await fetch(
-        `/api/organizations/${organizationId}/domains/${domainId}/source-domains?${params}`
-      );
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch source domains");
-      }
-
-      const responseData = await res.json();
-      setData(responseData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [organizationId, domainId, dateRange, platforms]);
-
-  useEffect(() => {
-    fetchSourceDomains();
-  }, [fetchSourceDomains]);
+  // Fetch source domains with React Query
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
+    queryKey: [
+      "source-domains",
+      organizationId,
+      domainId,
+      dateRange.startDate,
+      dateRange.endDate,
+      platforms.join(","),
+    ],
+    queryFn: () =>
+      fetchSourceDomains(
+        organizationId,
+        domainId,
+        dateRange.startDate,
+        dateRange.endDate,
+        platforms
+      ),
+    staleTime: QUERY_STALE_TIMES.dynamic,
+    placeholderData: (previousData) => previousData,
+  });
 
   // Calculate donut chart segments
   const chartSegments = useMemo(() => {
@@ -176,13 +188,49 @@ export function SourceDomainsSection({
     };
   };
 
-  if (isLoading && !data) {
+  // Skeleton loading state
+  if (isLoading) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            <p className="text-sm text-gray-500">Loading source domains...</p>
+        {/* Header skeleton */}
+        <div className="flex items-center gap-2 mb-1">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-3.5 w-3.5 rounded-full" />
+        </div>
+        <Skeleton className="h-3 w-64 mt-1 mb-4" />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Donut chart skeleton */}
+          <div className="flex flex-col items-center">
+            <div className="relative w-48 h-48">
+              <Skeleton className="w-full h-full rounded-full" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-24 h-24 rounded-full bg-white" />
+              </div>
+            </div>
+            {/* Legend skeleton */}
+            <div className="mt-4 flex flex-wrap gap-3 justify-center">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <Skeleton className="w-2.5 h-2.5 rounded-full" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Domain list skeleton */}
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-lg">
+                <Skeleton className="w-8 h-8 rounded-lg" />
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-32 mb-1" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+                <Skeleton className="h-4 w-12" />
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -194,9 +242,11 @@ export function SourceDomainsSection({
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <p className="text-red-600 mb-2">{error}</p>
+            <p className="text-red-600 mb-2">
+              {error instanceof Error ? error.message : "Something went wrong"}
+            </p>
             <button
-              onClick={fetchSourceDomains}
+              onClick={() => refetch()}
               className="text-sm text-gray-600 hover:text-gray-900 underline"
             >
               Try again
@@ -244,7 +294,12 @@ export function SourceDomainsSection({
           No source domains found for the selected period
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+        >
           {/* Donut Chart */}
           <div className="flex flex-col items-center">
             <div className="relative w-48 h-48">
@@ -334,11 +389,11 @@ export function SourceDomainsSection({
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Loading overlay for filter changes */}
-      {isLoading && data && (
+      {isFetching && data && (
         <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-xl">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
         </div>

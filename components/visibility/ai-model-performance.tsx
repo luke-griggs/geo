@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Info, Loader2, TableIcon, BarChart3 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Info, TableIcon, BarChart3 } from "lucide-react";
+import { motion } from "motion/react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TimePeriod, Platform } from "./filter-bar";
+import { QUERY_STALE_TIMES } from "@/components/providers";
 
 interface AIModelPerformanceProps {
   organizationId: string;
@@ -64,142 +68,105 @@ function SourceIcon({ source }: { source: string }) {
 
 type ViewMode = "table" | "chart";
 
+// Fetch function
+async function fetchModelPerformance(
+  organizationId: string,
+  domainId: string,
+  startDate: string,
+  endDate: string,
+  platforms: string[]
+): Promise<ModelStats[]> {
+  const params = new URLSearchParams({ startDate, endDate });
+
+  if (platforms.length > 0) {
+    params.set("platforms", platforms.join(","));
+  }
+
+  const res = await fetch(
+    `/api/organizations/${organizationId}/domains/${domainId}/model-performance?${params}`
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch data");
+  }
+
+  const data = await res.json();
+
+  // Transform the API response to match the component's expected format
+  return (data.models || []).map(
+    (model: {
+      provider: string;
+      visibilityRate: number;
+      totalRuns: number;
+      mentionedRuns: number;
+    }) => ({
+      model: model.provider,
+      avgPosition: null,
+      visibility: model.visibilityRate,
+      sentiment: null,
+      totalRuns: model.totalRuns,
+      mentions: model.mentionedRuns,
+    })
+  );
+}
+
 export function AIModelPerformance({
   organizationId,
   domainId,
   timePeriod,
   platforms,
 }: AIModelPerformanceProps) {
-  const [modelStats, setModelStats] = useState<ModelStats[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
 
-  const fetchModelStats = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  // Calculate date range
+  const dateRange = useMemo(() => {
+    const endDate = new Date();
+    let startDate: Date;
 
-    try {
-      // Calculate date range
-      const endDate = new Date();
-      let startDate: Date;
-
-      switch (timePeriod) {
-        case "7d":
-          startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case "30d":
-          startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-          break;
-        case "90d":
-          startDate = new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-      }
-
-      const params = new URLSearchParams({
-        startDate: startDate.toISOString().split("T")[0],
-        endDate: endDate.toISOString().split("T")[0],
-        limit: "1000", // Get all queries to aggregate
-      });
-
-      if (platforms.length > 0) {
-        params.set("platforms", platforms.join(","));
-      }
-
-      const res = await fetch(
-        `/api/organizations/${organizationId}/domains/${domainId}/queries?${params}`
-      );
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch data");
-      }
-
-      const data = await res.json();
-
-      // Aggregate by model
-      const modelMap: Record<
-        string,
-        {
-          totalRuns: number;
-          mentions: number;
-          positions: number[];
-          sentiments: number[];
-        }
-      > = {};
-
-      for (const query of data.queries || []) {
-        const model = query.source;
-        if (!modelMap[model]) {
-          modelMap[model] = {
-            totalRuns: 0,
-            mentions: 0,
-            positions: [],
-            sentiments: [],
-          };
-        }
-        modelMap[model].totalRuns++;
-
-        if (query.mentioned?.count > 0) {
-          modelMap[model].mentions++;
-          if (query.avgPosition !== null) {
-            modelMap[model].positions.push(query.avgPosition);
-          }
-          if (query.sentiment !== null) {
-            modelMap[model].sentiments.push(query.sentiment);
-          }
-        }
-      }
-
-      // Calculate stats
-      const stats: ModelStats[] = Object.entries(modelMap)
-        .map(([model, data]) => {
-          const avgPosition =
-            data.positions.length > 0
-              ? Math.round(
-                  (data.positions.reduce((a, b) => a + b, 0) /
-                    data.positions.length) *
-                    10
-                ) / 10
-              : null;
-
-          const visibility =
-            data.totalRuns > 0
-              ? Math.round((data.mentions / data.totalRuns) * 1000) / 10
-              : 0;
-
-          const sentiment =
-            data.sentiments.length > 0
-              ? Math.round(
-                  (data.sentiments.reduce((a, b) => a + b, 0) /
-                    data.sentiments.length) *
-                    100
-                )
-              : null;
-
-          return {
-            model,
-            avgPosition,
-            visibility,
-            sentiment,
-            totalRuns: data.totalRuns,
-            mentions: data.mentions,
-          };
-        })
-        .sort((a, b) => b.visibility - a.visibility);
-
-      setModelStats(stats);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsLoading(false);
+    switch (timePeriod) {
+      case "7d":
+        startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "30d":
+        startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case "90d":
+        startDate = new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
     }
-  }, [organizationId, domainId, timePeriod, platforms]);
 
-  useEffect(() => {
-    fetchModelStats();
-  }, [fetchModelStats]);
+    return {
+      startDate: startDate.toISOString().split("T")[0],
+      endDate: endDate.toISOString().split("T")[0],
+    };
+  }, [timePeriod]);
+
+  // Fetch model stats with React Query
+  const {
+    data: modelStats = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: [
+      "model-performance",
+      organizationId,
+      domainId,
+      dateRange.startDate,
+      dateRange.endDate,
+      platforms.join(","),
+    ],
+    queryFn: () =>
+      fetchModelPerformance(
+        organizationId,
+        domainId,
+        dateRange.startDate,
+        dateRange.endDate,
+        platforms
+      ),
+    staleTime: QUERY_STALE_TIMES.dynamic,
+  });
 
   // Find max visibility for bar scaling
   const maxVisibility = Math.max(...modelStats.map((s) => s.visibility), 1);
@@ -252,19 +219,49 @@ export function AIModelPerformance({
       </p>
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-48">
-          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <div className="space-y-0">
+          {/* Table header skeleton */}
+          <div className="flex items-center border-b border-gray-100 pb-3 mb-3">
+            <Skeleton className="h-3 w-10 mr-4" />
+            <Skeleton className="h-3 w-20 mr-auto" />
+            <Skeleton className="h-3 w-16 mx-4" />
+            <Skeleton className="h-3 w-16 mx-4" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+          {/* Table rows skeleton */}
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center py-3 border-b border-gray-50"
+            >
+              <Skeleton className="h-4 w-6 mr-4" />
+              <div className="flex items-center gap-2 mr-auto">
+                <Skeleton className="h-6 w-6 rounded-full" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <Skeleton className="h-4 w-8 mx-4" />
+              <Skeleton className="h-4 w-10 mx-4" />
+              <Skeleton className="h-4 w-8" />
+            </div>
+          ))}
         </div>
       ) : error ? (
         <div className="flex items-center justify-center h-48">
-          <p className="text-sm text-red-500">{error}</p>
+          <p className="text-sm text-red-500">
+            {error instanceof Error ? error.message : "Something went wrong"}
+          </p>
         </div>
       ) : modelStats.length === 0 ? (
         <div className="flex items-center justify-center h-48">
           <p className="text-sm text-gray-400">No data available</p>
         </div>
       ) : viewMode === "table" ? (
-        <div className="overflow-auto">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="overflow-auto"
+        >
           <table className="w-full">
             <thead>
               <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-100">
@@ -393,9 +390,14 @@ export function AIModelPerformance({
               ))}
             </tbody>
           </table>
-        </div>
+        </motion.div>
       ) : (
-        <div className="space-y-4">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="space-y-4"
+        >
           {modelStats.map((stat, index) => (
             <div key={stat.model} className="flex items-center gap-4">
               <span className="text-sm font-medium text-gray-500 w-6">
@@ -418,7 +420,7 @@ export function AIModelPerformance({
               </span>
             </div>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );

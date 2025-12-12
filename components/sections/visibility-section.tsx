@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import {
   FilterBar,
@@ -12,6 +13,8 @@ import { IndustryRanking } from "@/components/visibility/industry-ranking";
 import { SourceDomainsSection } from "@/components/visibility/source-domains";
 import { YourMentions } from "@/components/visibility/your-mentions";
 import { AIModelPerformance } from "@/components/visibility/ai-model-performance";
+import { Skeleton } from "@/components/ui/skeleton";
+import { QUERY_STALE_TIMES } from "@/components/providers";
 
 interface VisibilitySectionProps {
   organizationId: string;
@@ -48,6 +51,47 @@ interface VisibilityData {
   totalMentions: number;
 }
 
+// Fetch functions
+async function fetchVisibilityData(
+  organizationId: string,
+  domainId: string,
+  startDate: string,
+  endDate: string,
+  platforms: string[],
+  selectedBrands: string[]
+): Promise<VisibilityData> {
+  const params = new URLSearchParams({ startDate, endDate });
+
+  if (platforms.length > 0) {
+    params.set("platforms", platforms.join(","));
+  }
+
+  if (selectedBrands.length > 0) {
+    params.set("brands", selectedBrands.join(","));
+  }
+
+  const res = await fetch(
+    `/api/organizations/${organizationId}/domains/${domainId}/visibility?${params}`
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch visibility data");
+  }
+
+  return res.json();
+}
+
+async function fetchBrands(
+  organizationId: string,
+  domainId: string
+): Promise<{ brands: Brand[] }> {
+  const res = await fetch(
+    `/api/organizations/${organizationId}/domains/${domainId}/brands`
+  );
+  if (!res.ok) throw new Error("Failed to fetch brands");
+  return res.json();
+}
+
 export function VisibilitySection({
   organizationId,
   domainId,
@@ -58,16 +102,7 @@ export function VisibilitySection({
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
 
-  // Data state
-  const [visibilityData, setVisibilityData] = useState<VisibilityData | null>(
-    null
-  );
-  const [availableBrands, setAvailableBrands] = useState<Brand[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Calculate date range from time period
-  // IMPORTANT: Use UTC dates for API to match database UTC timestamps
   const dateRange = useMemo(() => {
     const endDate = new Date();
     let startDate: Date;
@@ -92,70 +127,103 @@ export function VisibilitySection({
     };
   }, [timePeriod]);
 
-  // Fetch available brands
-  useEffect(() => {
-    async function fetchBrands() {
-      try {
-        const res = await fetch(
-          `/api/organizations/${organizationId}/domains/${domainId}/brands`
-        );
-        if (!res.ok) throw new Error("Failed to fetch brands");
-        const data = await res.json();
-        setAvailableBrands(data.brands || []);
-      } catch (err) {
-        console.error("Error fetching brands:", err);
-      }
-    }
+  // Fetch available brands with React Query (cached for 5 minutes)
+  const { data: brandsData } = useQuery({
+    queryKey: ["brands", organizationId, domainId],
+    queryFn: () => fetchBrands(organizationId, domainId),
+    staleTime: QUERY_STALE_TIMES.stable,
+  });
 
-    fetchBrands();
-  }, [organizationId, domainId]);
+  const availableBrands = brandsData?.brands || [];
 
-  // Fetch visibility data
-  const fetchVisibilityData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  // Fetch visibility data with React Query
+  const {
+    data: visibilityData,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: [
+      "visibility",
+      organizationId,
+      domainId,
+      dateRange.startDate,
+      dateRange.endDate,
+      platforms.join(","),
+      selectedBrands.join(","),
+    ],
+    queryFn: () =>
+      fetchVisibilityData(
+        organizationId,
+        domainId,
+        dateRange.startDate,
+        dateRange.endDate,
+        platforms,
+        selectedBrands
+      ),
+    staleTime: QUERY_STALE_TIMES.dynamic,
+    // Keep previous data while fetching new data (for filter changes)
+    placeholderData: (previousData) => previousData,
+  });
 
-    try {
-      const params = new URLSearchParams({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-      });
-
-      if (platforms.length > 0) {
-        params.set("platforms", platforms.join(","));
-      }
-
-      if (selectedBrands.length > 0) {
-        params.set("brands", selectedBrands.join(","));
-      }
-
-      const res = await fetch(
-        `/api/organizations/${organizationId}/domains/${domainId}/visibility?${params}`
-      );
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch visibility data");
-      }
-
-      const data = await res.json();
-      setVisibilityData(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [organizationId, domainId, dateRange, platforms, selectedBrands]);
-
-  useEffect(() => {
-    fetchVisibilityData();
-  }, [fetchVisibilityData]);
-
-  if (isLoading && !visibilityData) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-          <p className="text-sm text-gray-500">Loading visibility data...</p>
+      <div className="flex flex-col pb-12">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Visibility</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Track how often your brand appears in AI responses compared to
+            competitors
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          {/* Filter bar skeleton */}
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-32 rounded-lg" />
+            <Skeleton className="h-10 w-36 rounded-lg" />
+            <Skeleton className="h-10 w-28 rounded-lg" />
+          </div>
+
+          {/* Main charts skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Visibility Chart skeleton */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Skeleton className="h-5 w-36" />
+                <Skeleton className="h-3.5 w-3.5 rounded-full" />
+              </div>
+              <Skeleton className="h-3 w-64 mb-4" />
+              <Skeleton className="h-9 w-20 mb-6" />
+              <Skeleton className="h-48 w-full rounded-lg" />
+            </div>
+
+            {/* Industry Ranking skeleton */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Skeleton className="h-5 w-36" />
+                <Skeleton className="h-3.5 w-3.5 rounded-full" />
+              </div>
+              <Skeleton className="h-3 w-48 mb-4" />
+              <Skeleton className="h-9 w-20 mb-4" />
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-4 w-6" />
+                    <div className="flex items-center gap-2 flex-1">
+                      <Skeleton className="w-6 h-6 rounded-md" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                    <Skeleton className="h-4 w-10" />
+                    <Skeleton className="h-4 w-10" />
+                    <Skeleton className="h-4 w-12" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -165,9 +233,11 @@ export function VisibilitySection({
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <p className="text-red-600 mb-2">{error}</p>
+          <p className="text-red-600 mb-2">
+            {error instanceof Error ? error.message : "Something went wrong"}
+          </p>
           <button
-            onClick={fetchVisibilityData}
+            onClick={() => refetch()}
             className="text-sm text-gray-600 hover:text-gray-900 underline"
           >
             Try again
@@ -241,7 +311,7 @@ export function VisibilitySection({
       </div>
 
       {/* Loading overlay for filter changes */}
-      {isLoading && visibilityData && (
+      {isFetching && visibilityData && (
         <div className="fixed inset-0 bg-white/50 flex items-center justify-center z-50 pointer-events-none">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>

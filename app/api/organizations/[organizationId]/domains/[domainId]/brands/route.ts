@@ -4,12 +4,98 @@ import { domain, promptRun, brandMention, prompt } from "@/db/schema";
 import { eq, inArray, desc } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { CACHE_HEADERS } from "@/lib/cache";
 
 interface RouteParams {
   params: Promise<{
     organizationId: string;
     domainId: string;
   }>;
+}
+
+// Brands data fetcher
+async function getBrandsData(domainId: string) {
+  // Get all prompts for this domain
+  const prompts = await db.query.prompt.findMany({
+    where: eq(prompt.domainId, domainId),
+  });
+  const promptIds = prompts.map((p) => p.id);
+
+  if (promptIds.length === 0) {
+    return { brands: [] };
+  }
+
+  // Get all prompt runs for these prompts
+  const runs = await db.query.promptRun.findMany({
+    where: inArray(promptRun.promptId, promptIds),
+    orderBy: [desc(promptRun.executedAt)],
+  });
+  const promptRunIds = runs.map((r) => r.id);
+
+  if (promptRunIds.length === 0) {
+    return { brands: [] };
+  }
+
+  // Get all brand mentions
+  const allBrandMentions = await db.query.brandMention.findMany({
+    where: inArray(brandMention.promptRunId, promptRunIds),
+  });
+
+  // Aggregate brand data
+  const brandAggregates: Record<
+    string,
+    {
+      name: string;
+      domain: string | null;
+      mentionCount: number;
+      firstSeen: Date;
+      lastSeen: Date;
+    }
+  > = {};
+
+  for (const bm of allBrandMentions) {
+    const key = bm.brandName.toLowerCase();
+    const run = runs.find((r) => r.id === bm.promptRunId);
+
+    if (!run) continue;
+
+    if (!brandAggregates[key]) {
+      brandAggregates[key] = {
+        name: bm.brandName,
+        domain: bm.brandDomain,
+        mentionCount: 0,
+        firstSeen: run.executedAt,
+        lastSeen: run.executedAt,
+      };
+    }
+
+    brandAggregates[key].mentionCount++;
+
+    // Keep the most recent domain if we have one
+    if (bm.brandDomain && !brandAggregates[key].domain) {
+      brandAggregates[key].domain = bm.brandDomain;
+    }
+
+    if (run.executedAt < brandAggregates[key].firstSeen) {
+      brandAggregates[key].firstSeen = run.executedAt;
+    }
+    if (run.executedAt > brandAggregates[key].lastSeen) {
+      brandAggregates[key].lastSeen = run.executedAt;
+    }
+  }
+
+  // Convert to array and sort by mention count
+  const brands = Object.values(brandAggregates)
+    .map((brand) => ({
+      name: brand.name,
+      domain: brand.domain,
+      mentionCount: brand.mentionCount,
+      firstSeen: brand.firstSeen.toISOString(),
+      lastSeen: brand.lastSeen.toISOString(),
+    }))
+    .sort((a, b) => b.mentionCount - a.mentionCount);
+
+  return { brands };
 }
 
 // GET /api/organizations/:organizationId/domains/:domainId/brands
@@ -42,87 +128,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Get all prompts for this domain
-    const prompts = await db.query.prompt.findMany({
-      where: eq(prompt.domainId, domainId),
+    // Fetch data directly (React Query handles client-side caching)
+    const data = await getBrandsData(domainId);
+
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": CACHE_HEADERS.stable,
+      },
     });
-    const promptIds = prompts.map((p) => p.id);
-
-    if (promptIds.length === 0) {
-      return NextResponse.json({ brands: [] });
-    }
-
-    // Get all prompt runs for these prompts
-    const runs = await db.query.promptRun.findMany({
-      where: inArray(promptRun.promptId, promptIds),
-      orderBy: [desc(promptRun.executedAt)],
-    });
-    const promptRunIds = runs.map((r) => r.id);
-
-    if (promptRunIds.length === 0) {
-      return NextResponse.json({ brands: [] });
-    }
-
-    // Get all brand mentions
-    const allBrandMentions = await db.query.brandMention.findMany({
-      where: inArray(brandMention.promptRunId, promptRunIds),
-    });
-
-    // Aggregate brand data
-    const brandAggregates: Record<
-      string,
-      {
-        name: string;
-        domain: string | null;
-        mentionCount: number;
-        firstSeen: Date;
-        lastSeen: Date;
-      }
-    > = {};
-
-    for (const bm of allBrandMentions) {
-      const key = bm.brandName.toLowerCase();
-      const run = runs.find((r) => r.id === bm.promptRunId);
-
-      if (!run) continue;
-
-      if (!brandAggregates[key]) {
-        brandAggregates[key] = {
-          name: bm.brandName,
-          domain: bm.brandDomain,
-          mentionCount: 0,
-          firstSeen: run.executedAt,
-          lastSeen: run.executedAt,
-        };
-      }
-
-      brandAggregates[key].mentionCount++;
-
-      // Keep the most recent domain if we have one
-      if (bm.brandDomain && !brandAggregates[key].domain) {
-        brandAggregates[key].domain = bm.brandDomain;
-      }
-
-      if (run.executedAt < brandAggregates[key].firstSeen) {
-        brandAggregates[key].firstSeen = run.executedAt;
-      }
-      if (run.executedAt > brandAggregates[key].lastSeen) {
-        brandAggregates[key].lastSeen = run.executedAt;
-      }
-    }
-
-    // Convert to array and sort by mention count
-    const brands = Object.values(brandAggregates)
-      .map((brand) => ({
-        name: brand.name,
-        domain: brand.domain,
-        mentionCount: brand.mentionCount,
-        firstSeen: brand.firstSeen.toISOString(),
-        lastSeen: brand.lastSeen.toISOString(),
-      }))
-      .sort((a, b) => b.mentionCount - a.mentionCount);
-
-    return NextResponse.json({ brands });
   } catch (error) {
     console.error("Error fetching brands:", error);
     return NextResponse.json(

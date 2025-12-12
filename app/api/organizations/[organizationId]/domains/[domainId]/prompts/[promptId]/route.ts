@@ -4,6 +4,7 @@ import { prompt, domain, organization } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { CACHE_HEADERS } from "@/lib/cache";
 
 type Params = Promise<{
   organizationId: string;
@@ -92,7 +93,14 @@ export async function GET(
       },
     });
 
-    return NextResponse.json({ prompt: promptWithRuns });
+    return NextResponse.json(
+      { prompt: promptWithRuns },
+      {
+        headers: {
+          "Cache-Control": CACHE_HEADERS.dynamic,
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching prompt:", error);
     return NextResponse.json(

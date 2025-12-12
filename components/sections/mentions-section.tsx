@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Search,
   ChevronDown,
@@ -13,6 +14,7 @@ import {
   Tag,
   Loader2,
 } from "lucide-react";
+import { motion } from "motion/react";
 import { QueryDetailPanel } from "@/components/query-detail-panel";
 import {
   Tooltip,
@@ -20,6 +22,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
+import { QUERY_STALE_TIMES } from "@/components/providers";
 
 interface MentionsSectionProps {
   organizationId: string;
@@ -520,28 +524,51 @@ interface AggregateStats {
   platformData: { name: string; mentions: number; percentage: number }[];
 }
 
+interface QueriesResponse {
+  queries: Query[];
+  pagination: Pagination;
+  stats: AggregateStats;
+}
+
+// Fetch function for queries
+async function fetchQueriesData(
+  organizationId: string,
+  domainId: string,
+  startDate: string,
+  endDate: string,
+  page: number,
+  limit: number,
+  showMentionsOnly: boolean
+): Promise<QueriesResponse> {
+  const params = new URLSearchParams({
+    startDate,
+    endDate,
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+
+  if (showMentionsOnly) {
+    params.set("mentionsOnly", "true");
+  }
+
+  const res = await fetch(
+    `/api/organizations/${organizationId}/domains/${domainId}/queries?${params}`
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch queries");
+  }
+
+  return res.json();
+}
+
 export function MentionsSection({
   organizationId,
   domainId,
   domainName,
 }: MentionsSectionProps) {
-  const [queries, setQueries] = useState<Query[]>([]);
-  const [pagination, setPagination] = useState<Pagination>({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 0,
-  });
-  const [aggregateStats, setAggregateStats] = useState<AggregateStats>({
-    totalMentions: 0,
-    totalCitations: 0,
-    totalQueries: 0,
-    chartData: [],
-    platformData: [],
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
   const [showMentionsOnly, setShowMentionsOnly] = useState(false);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("7d");
   const [searchQuery, setSearchQuery] = useState("");
@@ -549,7 +576,6 @@ export function MentionsSection({
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   // Calculate date range
-  // IMPORTANT: Use UTC dates for API to match database UTC timestamps
   const dateRange = useMemo(() => {
     const endDate = new Date();
     let startDate: Date;
@@ -574,57 +600,51 @@ export function MentionsSection({
     };
   }, [timePeriod]);
 
-  // Fetch queries
-  const fetchQueries = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  // Fetch queries with React Query
+  const {
+    data: queriesData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: [
+      "queries",
+      organizationId,
+      domainId,
+      dateRange.startDate,
+      dateRange.endDate,
+      page,
+      limit,
+      showMentionsOnly,
+    ],
+    queryFn: () =>
+      fetchQueriesData(
+        organizationId,
+        domainId,
+        dateRange.startDate,
+        dateRange.endDate,
+        page,
+        limit,
+        showMentionsOnly
+      ),
+    staleTime: QUERY_STALE_TIMES.dynamic,
+    placeholderData: (previousData) => previousData,
+  });
 
-    try {
-      const params = new URLSearchParams({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-      });
-
-      if (showMentionsOnly) {
-        params.set("mentionsOnly", "true");
-      }
-
-      const res = await fetch(
-        `/api/organizations/${organizationId}/domains/${domainId}/queries?${params}`
-      );
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch queries");
-      }
-
-      const data = await res.json();
-      setQueries(data.queries || []);
-      if (data.pagination) {
-        setPagination(data.pagination);
-      }
-      if (data.stats) {
-        setAggregateStats(data.stats);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    organizationId,
-    domainId,
-    dateRange,
-    showMentionsOnly,
-    pagination.page,
-    pagination.limit,
-  ]);
-
-  useEffect(() => {
-    fetchQueries();
-  }, [fetchQueries]);
+  const queries = queriesData?.queries || [];
+  const pagination = queriesData?.pagination || {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  };
+  const aggregateStats = queriesData?.stats || {
+    totalMentions: 0,
+    totalCitations: 0,
+    totalQueries: 0,
+    chartData: [],
+    platformData: [],
+  };
 
   // Filter queries by search
   const filteredQueries = useMemo(() => {
@@ -666,9 +686,11 @@ export function MentionsSection({
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <p className="text-red-600 mb-2">{error}</p>
+          <p className="text-red-600 mb-2">
+            {error instanceof Error ? error.message : "Something went wrong"}
+          </p>
           <button
-            onClick={fetchQueries}
+            onClick={() => refetch()}
             className="text-sm text-gray-600 hover:text-gray-900 underline"
           >
             Try again
@@ -742,23 +764,56 @@ export function MentionsSection({
               Daily brand mentions and branded citations across AI answers
             </p>
 
-            <div className="flex items-baseline gap-2 mb-4">
-              <span className="text-3xl font-bold text-gray-900">
-                {stats.totalMentions + stats.totalCitations}
-              </span>
-              <span
-                className={`text-xs font-medium ${
-                  stats.mentionsChange + stats.citationsChange >= 0
-                    ? "text-emerald-500"
-                    : "text-red-500"
-                }`}
-              >
-                {stats.mentionsChange + stats.citationsChange >= 0 ? "+" : ""}
-                {stats.mentionsChange + stats.citationsChange} vs yesterday
-              </span>
-            </div>
+            {isLoading ? (
+              <>
+                <div className="flex items-baseline gap-2 mb-4">
+                  <Skeleton className="h-9 w-16" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                {/* Chart skeleton */}
+                <div className="w-full rounded-xl p-4">
+                  <div className="flex justify-end gap-4 mb-3">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="w-2.5 h-2.5 rounded-full" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="w-2.5 h-2.5 rounded-full" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-32 w-full rounded-lg" />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-2 mb-4">
+                  <span className="text-3xl font-bold text-gray-900">
+                    {stats.totalMentions + stats.totalCitations}
+                  </span>
+                  <span
+                    className={`text-xs font-medium ${
+                      stats.mentionsChange + stats.citationsChange >= 0
+                        ? "text-emerald-500"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {stats.mentionsChange + stats.citationsChange >= 0
+                      ? "+"
+                      : ""}
+                    {stats.mentionsChange + stats.citationsChange} vs yesterday
+                  </span>
+                </div>
 
-            <MiniAreaChart data={stats.chartData} />
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                >
+                  <MiniAreaChart data={stats.chartData} />
+                </motion.div>
+              </>
+            )}
           </div>
 
           {/* Performance by Platform card */}
@@ -785,47 +840,80 @@ export function MentionsSection({
               Mentions and branded citations per AI engine
             </p>
 
-            <div className="flex items-baseline gap-2 mb-6">
-              <span className="text-3xl font-bold text-gray-900">
-                {stats.totalQueries > 0
-                  ? ((stats.totalMentions / stats.totalQueries) * 100).toFixed(
-                      1
-                    )
-                  : "0"}
-                %
-              </span>
-              <span className="text-sm text-gray-500">
-                overall mention rate
-              </span>
-            </div>
-
-            {/* Platform list */}
-            <div className="space-y-3">
-              {stats.platformData.length === 0 ? (
-                <p className="text-sm text-gray-400">No platform data yet</p>
-              ) : (
-                stats.platformData.map((platform) => (
-                  <div key={platform.name} className="flex items-center gap-4">
-                    <SourceIcon source={platform.name} />
-                    <span className="text-sm font-medium text-gray-900 w-20 capitalize">
-                      {platform.name}
-                    </span>
-                    <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-orange-500 rounded-full"
-                        style={{ width: `${platform.percentage}%` }}
-                      />
+            {isLoading ? (
+              <>
+                <div className="flex items-baseline gap-2 mb-6">
+                  <Skeleton className="h-9 w-16" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+                {/* Platform list skeleton */}
+                <div className="space-y-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <Skeleton className="w-8 h-8 rounded-full" />
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="flex-1 h-2.5 rounded-full" />
+                      <Skeleton className="h-4 w-8" />
+                      <Skeleton className="h-4 w-12" />
                     </div>
-                    <span className="text-sm font-semibold text-gray-900 w-8 text-right">
-                      {platform.mentions}
-                    </span>
-                    <span className="text-sm text-gray-500 w-14 text-right">
-                      {platform.percentage}%
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              >
+                <div className="flex items-baseline gap-2 mb-6">
+                  <span className="text-3xl font-bold text-gray-900">
+                    {stats.totalQueries > 0
+                      ? (
+                          (stats.totalMentions / stats.totalQueries) *
+                          100
+                        ).toFixed(1)
+                      : "0"}
+                    %
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    overall mention rate
+                  </span>
+                </div>
+
+                {/* Platform list */}
+                <div className="space-y-3">
+                  {stats.platformData.length === 0 ? (
+                    <p className="text-sm text-gray-400">
+                      No platform data yet
+                    </p>
+                  ) : (
+                    stats.platformData.map((platform) => (
+                      <div
+                        key={platform.name}
+                        className="flex items-center gap-4"
+                      >
+                        <SourceIcon source={platform.name} />
+                        <span className="text-sm font-medium text-gray-900 w-20 capitalize">
+                          {platform.name}
+                        </span>
+                        <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-orange-500 rounded-full"
+                            style={{ width: `${platform.percentage}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900 w-8 text-right">
+                          {platform.mentions}
+                        </span>
+                        <span className="text-sm text-gray-500 w-14 text-right">
+                          {platform.percentage}%
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            )}
           </div>
         </div>
 
@@ -1059,56 +1147,38 @@ export function MentionsSection({
             <div className="flex items-center gap-2 mt-4 px-2">
               {/* First page */}
               <button
-                onClick={() =>
-                  setPagination((p) => ({
-                    ...p,
-                    page: 1,
-                  }))
-                }
-                disabled={pagination.page <= 1}
+                onClick={() => setPage(1)}
+                disabled={page <= 1}
                 className="w-8 h-8 flex items-center justify-center text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
                 «
               </button>
               {/* Previous page */}
               <button
-                onClick={() =>
-                  setPagination((p) => ({
-                    ...p,
-                    page: Math.max(1, p.page - 1),
-                  }))
-                }
-                disabled={pagination.page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
                 className="w-8 h-8 flex items-center justify-center text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               {/* Page indicator */}
               <span className="text-sm text-gray-600 px-2">
-                {pagination.page} of {pagination.totalPages}
+                {page} of {pagination.totalPages}
               </span>
               {/* Next page */}
               <button
                 onClick={() =>
-                  setPagination((p) => ({
-                    ...p,
-                    page: Math.min(p.totalPages, p.page + 1),
-                  }))
+                  setPage((p) => Math.min(pagination.totalPages, p + 1))
                 }
-                disabled={pagination.page >= pagination.totalPages}
+                disabled={page >= pagination.totalPages}
                 className="w-8 h-8 flex items-center justify-center text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
               {/* Last page */}
               <button
-                onClick={() =>
-                  setPagination((p) => ({
-                    ...p,
-                    page: p.totalPages,
-                  }))
-                }
-                disabled={pagination.page >= pagination.totalPages}
+                onClick={() => setPage(pagination.totalPages)}
+                disabled={page >= pagination.totalPages}
                 className="w-8 h-8 flex items-center justify-center text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
                 »

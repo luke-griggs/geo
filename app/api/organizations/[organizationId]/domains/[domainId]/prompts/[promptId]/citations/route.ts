@@ -10,6 +10,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { CACHE_HEADERS } from "@/lib/cache";
 
 type Params = Promise<{
   organizationId: string;
@@ -187,10 +188,17 @@ export async function GET(
       })
       .sort((a, b) => b.count - a.count);
 
-    return NextResponse.json({
-      citations: aggregatedCitations,
-      totalRuns: runs.length,
-    });
+    return NextResponse.json(
+      {
+        citations: aggregatedCitations,
+        totalRuns: runs.length,
+      },
+      {
+        headers: {
+          "Cache-Control": CACHE_HEADERS.dynamic,
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching citations:", error);
     return NextResponse.json(

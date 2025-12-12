@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { generateId } from "@/lib/id";
+import { CACHE_HEADERS } from "@/lib/cache";
 
 interface RouteParams {
   params: Promise<{
@@ -33,6 +34,36 @@ async function checkOrgAccess(organizationId: string, userId: string) {
   });
 
   return membership ? org : null;
+}
+
+// Topics data fetcher
+async function getTopicsData(domainId: string) {
+  // Get all topics for this domain with their prompts
+  const topics = await db.query.topic.findMany({
+    where: eq(topic.domainId, domainId),
+    with: {
+      prompts: {
+        where: (prompt, { eq }) => eq(prompt.isArchived, false),
+      },
+    },
+    orderBy: (topic, { asc }) => [asc(topic.name)],
+  });
+
+  // Transform to include prompt count
+  const topicsWithCounts = topics.map((t) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description,
+    promptCount: t.prompts.length,
+    prompts: t.prompts.map((p) => ({
+      id: p.id,
+      promptText: p.promptText,
+      category: p.category,
+      isActive: p.isActive,
+    })),
+  }));
+
+  return { topics: topicsWithCounts };
 }
 
 // GET /api/organizations/:organizationId/domains/:domainId/topics
@@ -71,32 +102,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Domain not found" }, { status: 404 });
     }
 
-    // Get all topics for this domain with their prompts
-    const topics = await db.query.topic.findMany({
-      where: eq(topic.domainId, domainId),
-      with: {
-        prompts: {
-          where: (prompt, { eq }) => eq(prompt.isArchived, false),
-        },
+    // Fetch data directly (React Query handles client-side caching)
+    const data = await getTopicsData(domainId);
+
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": CACHE_HEADERS.stable,
       },
-      orderBy: (topic, { asc }) => [asc(topic.name)],
     });
-
-    // Transform to include prompt count
-    const topicsWithCounts = topics.map((t) => ({
-      id: t.id,
-      name: t.name,
-      description: t.description,
-      promptCount: t.prompts.length,
-      prompts: t.prompts.map((p) => ({
-        id: p.id,
-        promptText: p.promptText,
-        category: p.category,
-        isActive: p.isActive,
-      })),
-    }));
-
-    return NextResponse.json({ topics: topicsWithCounts });
   } catch (error) {
     console.error("Error fetching topics:", error);
     return NextResponse.json(

@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { ExternalLink, Info, Loader2 } from "lucide-react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { ExternalLink, Info } from "lucide-react";
+import { motion } from "motion/react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TimePeriod, Platform } from "./filter-bar";
+import { QUERY_STALE_TIMES } from "@/components/providers";
 
 interface YourMentionsProps {
   organizationId: string;
@@ -63,92 +67,112 @@ function SourceIcon({ source }: { source: string }) {
   );
 }
 
+// Fetch function
+async function fetchMentions(
+  organizationId: string,
+  domainId: string,
+  startDate: string,
+  endDate: string,
+  platforms: string[]
+): Promise<MentionQuery[]> {
+  const params = new URLSearchParams({
+    startDate,
+    endDate,
+    mentionsOnly: "true",
+    limit: "10",
+  });
+
+  if (platforms.length > 0) {
+    params.set("platforms", platforms.join(","));
+  }
+
+  const res = await fetch(
+    `/api/organizations/${organizationId}/domains/${domainId}/queries?${params}`
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch mentions");
+  }
+
+  const data = await res.json();
+
+  // Transform queries to mention format
+  return (data.queries || []).map(
+    (q: {
+      id: string;
+      promptId: string;
+      query: string;
+      date: string;
+      source: string;
+      avgPosition: number | null;
+      mentioned: { count: number };
+    }) => ({
+      id: q.id,
+      promptId: q.promptId,
+      query: q.query,
+      date: q.date,
+      source: q.source,
+      position: q.avgPosition,
+      mentioned: q.mentioned.count > 0,
+    })
+  );
+}
+
 export function YourMentions({
   organizationId,
   domainId,
   timePeriod,
   platforms,
 }: YourMentionsProps) {
-  const [mentions, setMentions] = useState<MentionQuery[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Calculate date range
+  const dateRange = useMemo(() => {
+    const endDate = new Date();
+    let startDate: Date;
 
-  const fetchMentions = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Calculate date range
-      const endDate = new Date();
-      let startDate: Date;
-
-      switch (timePeriod) {
-        case "7d":
-          startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case "30d":
-          startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-          break;
-        case "90d":
-          startDate = new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-      }
-
-      const params = new URLSearchParams({
-        startDate: startDate.toISOString().split("T")[0],
-        endDate: endDate.toISOString().split("T")[0],
-        mentionsOnly: "true",
-        limit: "10",
-      });
-
-      if (platforms.length > 0) {
-        params.set("platforms", platforms.join(","));
-      }
-
-      const res = await fetch(
-        `/api/organizations/${organizationId}/domains/${domainId}/queries?${params}`
-      );
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch mentions");
-      }
-
-      const data = await res.json();
-
-      // Transform queries to mention format
-      const mentionData: MentionQuery[] = (data.queries || []).map(
-        (q: {
-          id: string;
-          promptId: string;
-          query: string;
-          date: string;
-          source: string;
-          avgPosition: number | null;
-          mentioned: { count: number };
-        }) => ({
-          id: q.id,
-          promptId: q.promptId,
-          query: q.query,
-          date: q.date,
-          source: q.source,
-          position: q.avgPosition,
-          mentioned: q.mentioned.count > 0,
-        })
-      );
-
-      setMentions(mentionData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsLoading(false);
+    switch (timePeriod) {
+      case "7d":
+        startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "30d":
+        startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case "90d":
+        startDate = new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
     }
-  }, [organizationId, domainId, timePeriod, platforms]);
 
-  useEffect(() => {
-    fetchMentions();
-  }, [fetchMentions]);
+    return {
+      startDate: startDate.toISOString().split("T")[0],
+      endDate: endDate.toISOString().split("T")[0],
+    };
+  }, [timePeriod]);
+
+  // Fetch mentions with React Query
+  const {
+    data: mentions = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: [
+      "your-mentions",
+      organizationId,
+      domainId,
+      dateRange.startDate,
+      dateRange.endDate,
+      platforms.join(","),
+    ],
+    queryFn: () =>
+      fetchMentions(
+        organizationId,
+        domainId,
+        dateRange.startDate,
+        dateRange.endDate,
+        platforms
+      ),
+    staleTime: QUERY_STALE_TIMES.dynamic,
+  });
 
   return (
     <div className="p-5 bg-white border border-gray-200 rounded-xl">
@@ -180,19 +204,45 @@ export function YourMentions({
       </p>
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-48">
-          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <div className="space-y-0">
+          {/* Table header skeleton */}
+          <div className="flex items-center border-b border-gray-100 pb-3 mb-3">
+            <Skeleton className="h-3 w-16 mr-auto" />
+            <Skeleton className="h-3 w-12 mx-4" />
+            <Skeleton className="h-3 w-12" />
+          </div>
+          {/* Table rows skeleton */}
+          {[...Array(5)].map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center py-3 border-b border-gray-50"
+            >
+              <Skeleton className="h-4 w-48 mr-auto" />
+              <div className="flex items-center gap-2 mx-4">
+                <Skeleton className="h-6 w-6 rounded-full" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <Skeleton className="h-5 w-8 rounded" />
+            </div>
+          ))}
         </div>
       ) : error ? (
         <div className="flex items-center justify-center h-48">
-          <p className="text-sm text-red-500">{error}</p>
+          <p className="text-sm text-red-500">
+            {error instanceof Error ? error.message : "Something went wrong"}
+          </p>
         </div>
       ) : mentions.length === 0 ? (
         <div className="flex items-center justify-center h-48">
           <p className="text-sm text-gray-400">No mentions found</p>
         </div>
       ) : (
-        <div className="overflow-auto">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="overflow-auto"
+        >
           <table className="w-full">
             <thead>
               <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-100">
@@ -228,7 +278,7 @@ export function YourMentions({
                 </th>
                 <th className="pb-3 pl-4 text-center">
                   <div className="flex items-center justify-center gap-1">
-                    # Rank
+                    Rank
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger>
@@ -277,7 +327,7 @@ export function YourMentions({
               ))}
             </tbody>
           </table>
-        </div>
+        </motion.div>
       )}
     </div>
   );

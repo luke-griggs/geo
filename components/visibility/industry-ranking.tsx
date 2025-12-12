@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Info } from "lucide-react";
+import { motion } from "motion/react";
 import {
   Tooltip,
   TooltipContent,
@@ -29,7 +30,12 @@ export function IndustryRanking({
   userVisibility,
 }: IndustryRankingProps) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="bg-white rounded-xl border border-gray-200 p-6"
+    >
       <div className="flex items-center justify-between mb-4">
         <div>
           <div className="flex items-center gap-2">
@@ -214,6 +220,6 @@ export function IndustryRanking({
           </table>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
