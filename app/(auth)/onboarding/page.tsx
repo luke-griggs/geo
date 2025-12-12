@@ -19,15 +19,23 @@ import {
   PromptsStep,
   OnboardingRightPanel,
 } from "@/components/onboarding";
+import { useSession } from "@/lib/auth-client";
 
 function OnboardingContent() {
   const { currentStep, goBack } = useOnboarding();
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const { data: session, isPending: isSessionLoading } = useSession();
+  const [isCheckingOrgs, setIsCheckingOrgs] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
 
-  // Check if user has already completed onboarding
+  // Check if user has already completed onboarding (only if authenticated)
   useEffect(() => {
+    // Skip if session is still loading or user is not authenticated
+    if (isSessionLoading || !session?.user) {
+      return;
+    }
+
     async function checkOnboardingStatus() {
+      setIsCheckingOrgs(true);
       try {
         const res = await fetch("/api/organizations");
         if (res.ok) {
@@ -45,13 +53,16 @@ function OnboardingContent() {
           }
         }
       } catch {
-        // Not authenticated or error - continue with onboarding
+        // Error fetching - continue with onboarding
       } finally {
-        setIsCheckingAuth(false);
+        setIsCheckingOrgs(false);
       }
     }
     checkOnboardingStatus();
-  }, []);
+  }, [session, isSessionLoading]);
+
+  // Determine if we're still in a loading state
+  const isCheckingAuth = isSessionLoading || (session?.user && isCheckingOrgs);
 
   // Show loading while checking auth
   if (isCheckingAuth || hasCompletedOnboarding) {
